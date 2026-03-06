@@ -1,0 +1,365 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Font Faces ─────────────────────────────────────────────── */
+@font-face {
+  font-family: "Bricolage Grotesque";
+  src: url("/assets/fonts/BricolageGrotesque[opsz,wdth,wght].woff2") format("woff2");
+  font-weight: 200 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Sora";
+  src: url("/assets/fonts/Sora[wght].woff2") format("woff2");
+  font-weight: 100 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/assets/fonts/JetBrainsMono[wght].woff2") format("woff2");
+  font-weight: 100 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ─── Design Tokens ─────────────────────────────────────────── */
+@layer base {
+  :root {
+    --radius: 0.75rem;
+
+    /* Dark premium palette — deep red neon on near-black */
+    --background: 0.08 0.015 15;
+    --foreground: 0.95 0.01 20;
+
+    --card: 0.11 0.02 15;
+    --card-foreground: 0.95 0.01 20;
+
+    --popover: 0.13 0.02 15;
+    --popover-foreground: 0.95 0.01 20;
+
+    /* Red neon primary */
+    --primary: 0.65 0.26 20;
+    --primary-foreground: 0.97 0.01 20;
+
+    --secondary: 0.16 0.03 15;
+    --secondary-foreground: 0.85 0.01 20;
+
+    --muted: 0.14 0.02 15;
+    --muted-foreground: 0.52 0.05 20;
+
+    /* Crimson accent */
+    --accent: 0.55 0.28 15;
+    --accent-foreground: 0.97 0.01 20;
+
+    --destructive: 0.63 0.22 25;
+    --destructive-foreground: 0.97 0 0;
+
+    --border: 0.22 0.05 15;
+    --input: 0.18 0.03 15;
+    --ring: 0.65 0.26 20;
+
+    /* Red neon glow colors */
+    --glow-red: oklch(0.65 0.26 20 / 0.5);
+    --glow-crimson: oklch(0.55 0.28 15 / 0.5);
+    --glow-red-strong: oklch(0.65 0.26 20 / 0.85);
+    --glow-crimson-strong: oklch(0.55 0.28 15 / 0.85);
+    --glow-red-subtle: oklch(0.65 0.26 20 / 0.2);
+
+    /* Chart */
+    --chart-1: 0.65 0.26 20;
+    --chart-2: 0.55 0.28 15;
+    --chart-3: 0.70 0.22 30;
+    --chart-4: 0.75 0.18 40;
+    --chart-5: 0.60 0.25 10;
+
+    --sidebar: 0.10 0.02 15;
+    --sidebar-foreground: 0.95 0.01 20;
+    --sidebar-primary: 0.65 0.26 20;
+    --sidebar-primary-foreground: 0.97 0.01 20;
+    --sidebar-accent: 0.16 0.03 15;
+    --sidebar-accent-foreground: 0.85 0.01 20;
+    --sidebar-border: 0.22 0.05 15;
+    --sidebar-ring: 0.65 0.26 20;
+  }
+
+  /* Force dark mode always */
+  html {
+    color-scheme: dark;
+    scroll-behavior: smooth;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    background-color: oklch(0.08 0.015 15);
+    background-image:
+      radial-gradient(ellipse 80% 50% at 20% -10%, oklch(0.65 0.26 20 / 0.07) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 40% at 80% 100%, oklch(0.55 0.28 15 / 0.05) 0%, transparent 60%);
+  }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: oklch(0.10 0.02 15);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: oklch(0.28 0.08 15);
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.65 0.26 20);
+  }
+}
+
+/* ─── Global Utilities ──────────────────────────────────────── */
+@layer utilities {
+  /* Red neon glows */
+  .glow-red {
+    box-shadow: 0 0 10px var(--glow-red), 0 0 20px var(--glow-red), 0 0 40px var(--glow-red-subtle);
+  }
+  .glow-crimson {
+    box-shadow: 0 0 10px var(--glow-crimson), 0 0 20px var(--glow-crimson);
+  }
+  .glow-red-text {
+    text-shadow: 0 0 8px var(--glow-red), 0 0 20px var(--glow-red), 0 0 40px var(--glow-red-subtle);
+  }
+  .glow-crimson-text {
+    text-shadow: 0 0 8px var(--glow-crimson), 0 0 20px var(--glow-crimson);
+  }
+
+  /* Legacy alias for compatibility */
+  .glow-cyan { box-shadow: 0 0 10px var(--glow-red), 0 0 20px var(--glow-red); }
+  .glow-purple { box-shadow: 0 0 10px var(--glow-crimson), 0 0 20px var(--glow-crimson); }
+  .glow-cyan-text { text-shadow: 0 0 10px var(--glow-red), 0 0 30px var(--glow-red); }
+  .glow-purple-text { text-shadow: 0 0 10px var(--glow-crimson), 0 0 30px var(--glow-crimson); }
+
+  /* Glass morphism — red-tinted */
+  .glass {
+    background: oklch(0.11 0.02 15 / 0.6);
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+    border: 1px solid oklch(0.35 0.08 15 / 0.25);
+  }
+
+  .glass-strong {
+    background: oklch(0.11 0.02 15 / 0.88);
+    backdrop-filter: blur(24px) saturate(200%);
+    -webkit-backdrop-filter: blur(24px) saturate(200%);
+    border: 1px solid oklch(0.35 0.08 15 / 0.4);
+  }
+
+  .glass-red {
+    background: oklch(0.11 0.02 15 / 0.7);
+    backdrop-filter: blur(20px) saturate(200%);
+    -webkit-backdrop-filter: blur(20px) saturate(200%);
+    border: 1px solid oklch(0.65 0.26 20 / 0.25);
+    box-shadow: inset 0 0 30px oklch(0.65 0.26 20 / 0.04), 0 0 20px oklch(0.65 0.26 20 / 0.08);
+  }
+
+  /* Gradient text */
+  .gradient-text {
+    background: linear-gradient(135deg, oklch(0.75 0.24 22), oklch(0.55 0.28 10));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .gradient-text-alt {
+    background: linear-gradient(135deg, oklch(0.55 0.28 10), oklch(0.75 0.24 22));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Neon border utility */
+  .neon-border {
+    border: 1px solid oklch(0.65 0.26 20 / 0.5);
+    box-shadow: 0 0 8px oklch(0.65 0.26 20 / 0.3), inset 0 0 8px oklch(0.65 0.26 20 / 0.05);
+  }
+
+  .neon-border-strong {
+    border: 1px solid oklch(0.65 0.26 20 / 0.8);
+    box-shadow: 0 0 15px oklch(0.65 0.26 20 / 0.5), 0 0 30px oklch(0.65 0.26 20 / 0.2), inset 0 0 15px oklch(0.65 0.26 20 / 0.05);
+  }
+
+  .hover-shadow-glow:hover {
+    box-shadow: 0 0 20px var(--glow-red), 0 0 40px var(--glow-red-subtle);
+    transition: box-shadow 0.3s ease;
+  }
+}
+
+/* ─── Keyframes ─────────────────────────────────────────────── */
+@layer base {
+  @keyframes float {
+    0%, 100% { transform: translateY(0px) rotate(0deg); }
+    33% { transform: translateY(-12px) rotate(1deg); }
+    66% { transform: translateY(-6px) rotate(-1deg); }
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 8px var(--glow-red), 0 0 16px var(--glow-red); }
+    50% { box-shadow: 0 0 20px var(--glow-red-strong), 0 0 40px var(--glow-red-strong), 0 0 60px var(--glow-red); }
+  }
+
+  @keyframes pulse-glow-purple {
+    0%, 100% { box-shadow: 0 0 8px var(--glow-crimson), 0 0 16px var(--glow-crimson); }
+    50% { box-shadow: 0 0 20px var(--glow-crimson-strong), 0 0 40px var(--glow-crimson-strong), 0 0 60px var(--glow-crimson); }
+  }
+
+  @keyframes neon-flicker {
+    0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% {
+      box-shadow: 0 0 8px var(--glow-red), 0 0 16px var(--glow-red), 0 0 30px var(--glow-red-subtle);
+    }
+    20%, 24%, 55% {
+      box-shadow: none;
+    }
+  }
+
+  @keyframes neon-text-flicker {
+    0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% {
+      text-shadow: 0 0 8px var(--glow-red), 0 0 20px var(--glow-red), 0 0 40px var(--glow-red-subtle);
+    }
+    20%, 24%, 55% {
+      text-shadow: none;
+    }
+  }
+
+  @keyframes neon-border-pulse {
+    0%, 100% {
+      border-color: oklch(0.65 0.26 20 / 0.4);
+      box-shadow: 0 0 8px var(--glow-red-subtle);
+    }
+    50% {
+      border-color: oklch(0.65 0.26 20 / 0.9);
+      box-shadow: 0 0 20px var(--glow-red), 0 0 40px var(--glow-red-subtle);
+    }
+  }
+
+  @keyframes marquee {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+
+  @keyframes particle-drift {
+    0% { transform: translateY(100vh) translateX(0) scale(0); opacity: 0; }
+    10% { opacity: 1; }
+    90% { opacity: 0.6; }
+    100% { transform: translateY(-20px) translateX(var(--drift-x, 20px)) scale(1); opacity: 0; }
+  }
+
+  @keyframes gradient-shift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+
+  @keyframes spin-slow {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  @keyframes accordion-down {
+    from { height: 0; }
+    to { height: var(--radix-accordion-content-height); }
+  }
+
+  @keyframes accordion-up {
+    from { height: var(--radix-accordion-content-height); }
+    to { height: 0; }
+  }
+
+  @keyframes fade-in-up {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+
+  @keyframes scanline {
+    0% { transform: translateY(-100%); }
+    100% { transform: translateY(100vh); }
+  }
+
+  @keyframes rotate-glow {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+}
+
+/* ─── Animation utilities ───────────────────────────────────── */
+@layer utilities {
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+
+  .animate-float-delayed {
+    animation: float 6s ease-in-out infinite 2s;
+  }
+
+  .animate-pulse-glow {
+    animation: pulse-glow 2.5s ease-in-out infinite;
+  }
+
+  .animate-pulse-glow-purple {
+    animation: pulse-glow-purple 2.5s ease-in-out infinite;
+  }
+
+  .animate-neon-flicker {
+    animation: neon-flicker 5s ease-in-out infinite;
+  }
+
+  .animate-neon-text-flicker {
+    animation: neon-text-flicker 5s ease-in-out infinite;
+  }
+
+  .animate-neon-border {
+    animation: neon-border-pulse 2s ease-in-out infinite;
+  }
+
+  .animate-marquee {
+    animation: marquee var(--marquee-duration, 30s) linear infinite;
+  }
+
+  .animate-marquee-pause:hover {
+    animation-play-state: paused;
+  }
+
+  .animate-gradient {
+    background-size: 200% 200%;
+    animation: gradient-shift 4s ease infinite;
+  }
+
+  .animate-spin-slow {
+    animation: spin-slow 20s linear infinite;
+  }
+
+  .animate-fade-in-up {
+    animation: fade-in-up 0.6s ease forwards;
+  }
+
+  .animate-shimmer {
+    background: linear-gradient(90deg, transparent 0%, oklch(0.65 0.26 20 / 0.15) 50%, transparent 100%);
+    background-size: 200% 100%;
+    animation: shimmer 2s infinite;
+  }
+
+  /* Particle elements */
+  .particle {
+    animation: particle-drift var(--particle-duration, 8s) ease-in infinite;
+    animation-delay: var(--particle-delay, 0s);
+  }
+}
