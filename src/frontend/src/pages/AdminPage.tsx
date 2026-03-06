@@ -30,9 +30,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Link } from "@tanstack/react-router";
 import {
+  ChevronDown,
+  ChevronUp,
   Code2,
   Eye,
   EyeOff,
+  ImagePlus,
+  Images,
   LayoutDashboard,
   Loader2,
   Lock,
@@ -258,6 +262,9 @@ interface ProjectFormData {
   techTags: string;
   status: "completed" | "in-progress" | "concept";
   year: string;
+  // image upload
+  uploadedImages: string[]; // base64 data URLs
+  urlInputVisible: boolean; // toggle for the URL fallback
 }
 
 const EMPTY_PROJECT: ProjectFormData = {
@@ -271,6 +278,8 @@ const EMPTY_PROJECT: ProjectFormData = {
   techTags: "",
   status: "completed",
   year: new Date().getFullYear().toString(),
+  uploadedImages: [],
+  urlInputVisible: false,
 };
 
 const CATEGORIES = ["Web Dev", "Design", "AI", "Editing"];
@@ -300,14 +309,87 @@ function ProjectDialog({
 }: ProjectDialogProps) {
   const [form, setForm] = useState<ProjectFormData>(EMPTY_PROJECT);
   const [saving, setSaving] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Convert selected files to base64 and add to uploadedImages
+  const handleFilesSelected = (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const imageFiles = Array.from(files).filter((f) =>
+      f.type.startsWith("image/"),
+    );
+    if (imageFiles.length === 0) return;
+
+    // Size warning: rough estimate (~1.37x for base64 overhead)
+    const totalBytes = imageFiles.reduce((sum, f) => sum + f.size, 0);
+    const currentBase64Bytes = form.uploadedImages.reduce(
+      (sum, img) => sum + img.length,
+      0,
+    );
+    if (currentBase64Bytes + totalBytes * 1.37 > 5 * 1024 * 1024) {
+      toast.warning(
+        "Total image size may exceed 5MB — consider using smaller images",
+      );
+    }
+
+    Promise.all(
+      imageFiles.map(
+        (file) =>
+          new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          }),
+      ),
+    )
+      .then((newImages) => {
+        setForm((prev) => ({
+          ...prev,
+          uploadedImages: [...prev.uploadedImages, ...newImages],
+        }));
+      })
+      .catch(() => {
+        toast.error("Failed to read some images");
+      });
+  };
+
+  const handleRemoveImage = (index: number) => {
+    setForm((prev) => ({
+      ...prev,
+      uploadedImages: prev.uploadedImages.filter((_, i) => i !== index),
+    }));
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragging(true);
+  };
+
+  const handleDragLeave = () => setDragging(false);
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragging(false);
+    handleFilesSelected(e.dataTransfer.files);
+  };
 
   useEffect(() => {
     if (project) {
       const extras = getProjectExtra(project.id.toString());
+      const extraImages = extras?.extraImages ?? [];
+      // Determine if imageUrl looks like an uploaded base64 image
+      const isBase64 = project.imageUrl.startsWith("data:image/");
+      const allImages = isBase64
+        ? [
+            project.imageUrl,
+            ...extraImages.filter((img) => img !== project.imageUrl),
+          ]
+        : extraImages;
       setForm({
         title: project.title,
         description: project.description,
-        imageUrl: project.imageUrl,
+        imageUrl: isBase64 ? "" : project.imageUrl,
         category: project.category,
         link: project.link,
         featured: project.featured,
@@ -315,6 +397,8 @@ function ProjectDialog({
         techTags: extras?.techTags?.join(", ") ?? "",
         status: extras?.status ?? "completed",
         year: extras?.year ?? new Date().getFullYear().toString(),
+        uploadedImages: allImages,
+        urlInputVisible: !isBase64 && !!project.imageUrl,
       });
     } else {
       setForm(EMPTY_PROJECT);
@@ -330,13 +414,17 @@ function ProjectDialog({
     if (!form.title.trim()) return;
     setSaving(true);
     try {
+      // Resolve the primary imageUrl: uploaded images take priority over URL
+      const primaryImage =
+        form.uploadedImages.length > 0 ? form.uploadedImages[0] : form.imageUrl;
+
       let savedId: bigint;
       if (project) {
         updateLocalProject(
           project.id,
           form.title,
           form.description,
-          form.imageUrl,
+          primaryImage,
           form.category,
           form.link,
           form.featured,
@@ -348,7 +436,7 @@ function ProjectDialog({
         const newProject = addLocalProject(
           form.title,
           form.description,
-          form.imageUrl,
+          primaryImage,
           form.category,
           form.link,
           form.featured,
@@ -358,7 +446,7 @@ function ProjectDialog({
         toast.success("Project added successfully");
       }
 
-      // Save extras
+      // Save extras including extraImages (all uploaded images)
       const extras: ProjectExtras = {
         id: savedId.toString(),
         techTags: form.techTags
@@ -367,6 +455,7 @@ function ProjectDialog({
           .filter(Boolean),
         status: form.status,
         year: form.year,
+        extraImages: form.uploadedImages,
       };
       upsertProjectExtra(extras);
 
@@ -520,14 +609,165 @@ function ProjectDialog({
             )}
           </div>
 
-          <div className="space-y-1.5">
-            <Label>Image URL</Label>
-            <Input
-              value={form.imageUrl}
-              onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
-              placeholder="https://..."
-              className="bg-input/50"
-            />
+          {/* ─── Multi-Image Upload ─── */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="flex items-center gap-1.5">
+                <Images className="w-3.5 h-3.5 text-primary" />
+                Project Images
+              </Label>
+              {form.uploadedImages.length > 0 && (
+                <span
+                  className="text-xs px-2 py-0.5 rounded-full font-medium"
+                  style={{
+                    background: "oklch(0.65 0.26 20 / 0.15)",
+                    border: "1px solid oklch(0.65 0.26 20 / 0.3)",
+                    color: "oklch(0.78 0.22 22)",
+                  }}
+                >
+                  {form.uploadedImages.length}{" "}
+                  {form.uploadedImages.length === 1 ? "image" : "images"}{" "}
+                  selected
+                </span>
+              )}
+            </div>
+
+            {/* Dropzone */}
+            <div
+              data-ocid="project.dropzone"
+              className={`relative rounded-xl border-2 border-dashed transition-all duration-200 overflow-hidden ${
+                dragging
+                  ? "border-primary bg-primary/10 scale-[1.01]"
+                  : "border-border/40"
+              }`}
+              style={{ minHeight: "90px" }}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="sr-only"
+                data-ocid="project.upload_button"
+                onChange={(e) => handleFilesSelected(e.target.files)}
+                onClick={(e) => {
+                  // Reset value so same file can be re-selected
+                  (e.target as HTMLInputElement).value = "";
+                }}
+              />
+
+              {form.uploadedImages.length === 0 ? (
+                <button
+                  type="button"
+                  className="w-full flex flex-col items-center justify-center py-6 px-4 text-center hover:bg-primary/5 transition-colors cursor-pointer"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <div
+                    className="w-10 h-10 rounded-xl flex items-center justify-center mb-2"
+                    style={{
+                      background: "oklch(0.65 0.26 20 / 0.12)",
+                      border: "1px solid oklch(0.65 0.26 20 / 0.25)",
+                    }}
+                  >
+                    <ImagePlus className="w-5 h-5 text-primary" />
+                  </div>
+                  <p className="text-sm font-medium text-foreground/80">
+                    Click to upload or drag images here
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    JPG, PNG, WebP accepted · Multiple images allowed
+                  </p>
+                </button>
+              ) : (
+                <div className="p-3">
+                  {/* Thumbnail grid */}
+                  <div className="grid grid-cols-3 gap-2">
+                    {form.uploadedImages.map((img, idx) => (
+                      <div
+                        key={img.slice(0, 60)}
+                        className="relative group rounded-lg overflow-hidden aspect-video"
+                        style={{ background: "oklch(0.12 0.01 15)" }}
+                      >
+                        <img
+                          src={img}
+                          alt={`Upload ${idx + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                        {idx === 0 && (
+                          <div
+                            className="absolute top-1 left-1 text-[9px] font-bold px-1.5 py-0.5 rounded"
+                            style={{
+                              background: "oklch(0.65 0.26 20 / 0.9)",
+                              color: "#fff",
+                            }}
+                          >
+                            PRIMARY
+                          </div>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveImage(idx)}
+                          className="absolute top-1 right-1 w-5 h-5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                          style={{ background: "oklch(0.25 0.05 15 / 0.85)" }}
+                          aria-label={`Remove image ${idx + 1}`}
+                        >
+                          <X className="w-3 h-3 text-white" />
+                        </button>
+                      </div>
+                    ))}
+                    {/* Add more button */}
+                    <button
+                      type="button"
+                      className="rounded-lg border-2 border-dashed border-border/40 flex flex-col items-center justify-center aspect-video hover:border-primary/50 hover:bg-primary/5 transition-all text-muted-foreground hover:text-primary"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span className="text-[10px] mt-0.5">Add more</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* URL fallback toggle */}
+            <button
+              type="button"
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors mt-1"
+              onClick={() =>
+                setForm((prev) => ({
+                  ...prev,
+                  urlInputVisible: !prev.urlInputVisible,
+                }))
+              }
+            >
+              {form.urlInputVisible ? (
+                <ChevronUp className="w-3.5 h-3.5" />
+              ) : (
+                <ChevronDown className="w-3.5 h-3.5" />
+              )}
+              {form.urlInputVisible
+                ? "Hide URL input"
+                : "Or enter image URL instead"}
+            </button>
+
+            {form.urlInputVisible && (
+              <div className="space-y-1">
+                <Input
+                  value={form.imageUrl}
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, imageUrl: e.target.value }))
+                  }
+                  placeholder="https://example.com/image.jpg"
+                  className="bg-input/50 text-sm"
+                />
+                <p className="text-xs text-muted-foreground">
+                  URL is used only if no images are uploaded above.
+                </p>
+              </div>
+            )}
           </div>
 
           <div className="space-y-1.5">

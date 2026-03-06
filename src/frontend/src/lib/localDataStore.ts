@@ -372,6 +372,7 @@ export interface ProjectExtras {
   techTags: string[];
   status: "completed" | "in-progress" | "concept";
   year: string;
+  extraImages?: string[]; // base64 data URLs for additional uploaded images
 }
 
 const PROJECT_EXTRAS_KEY = "portfolio_project_extras";
