@@ -71,23 +71,23 @@ export default {
           border: "oklch(var(--sidebar-border))",
           ring: "oklch(var(--sidebar-ring))",
         },
-        // Brand colors
-        cyan: {
-          DEFAULT: "oklch(0.72 0.19 210)",
-          dim: "oklch(0.52 0.14 210)",
-          bright: "oklch(0.85 0.2 210)",
+        // Brand colors — red neon palette
+        neon: {
+          DEFAULT: "oklch(0.65 0.26 20)",
+          dim: "oklch(0.45 0.22 20)",
+          bright: "oklch(0.75 0.24 22)",
         },
-        purple: {
-          DEFAULT: "oklch(0.62 0.22 295)",
-          dim: "oklch(0.42 0.16 295)",
-          bright: "oklch(0.75 0.24 295)",
+        crimson: {
+          DEFAULT: "oklch(0.55 0.28 15)",
+          dim: "oklch(0.40 0.20 15)",
+          bright: "oklch(0.65 0.26 10)",
         },
         dark: {
-          100: "oklch(0.22 0.02 270)",
-          200: "oklch(0.18 0.02 270)",
-          300: "oklch(0.15 0.02 270)",
-          400: "oklch(0.12 0.02 270)",
-          500: "oklch(0.1 0.01 270)",
+          100: "oklch(0.18 0.02 15)",
+          200: "oklch(0.14 0.02 15)",
+          300: "oklch(0.11 0.02 15)",
+          400: "oklch(0.09 0.01 15)",
+          500: "oklch(0.07 0.01 15)",
         },
       },
       borderRadius: {
@@ -97,14 +97,14 @@ export default {
         xl: "calc(var(--radius) + 4px)",
         "2xl": "calc(var(--radius) + 8px)",
       },
-      boxShadow: {
+        boxShadow: {
         xs: "0 1px 2px 0 rgba(0,0,0,0.05)",
-        glow: "0 0 20px oklch(0.72 0.19 210 / 0.4)",
-        "glow-lg": "0 0 40px oklch(0.72 0.19 210 / 0.3), 0 0 80px oklch(0.72 0.19 210 / 0.15)",
-        "glow-purple": "0 0 20px oklch(0.62 0.22 295 / 0.4)",
-        "glow-purple-lg": "0 0 40px oklch(0.62 0.22 295 / 0.3), 0 0 80px oklch(0.62 0.22 295 / 0.15)",
-        card: "0 4px 24px oklch(0 0 0 / 0.4), 0 0 0 1px oklch(0.3 0.05 270 / 0.2)",
-        "card-hover": "0 8px 40px oklch(0 0 0 / 0.5), 0 0 0 1px oklch(0.72 0.19 210 / 0.3)",
+        glow: "0 0 20px oklch(0.65 0.26 20 / 0.5)",
+        "glow-lg": "0 0 40px oklch(0.65 0.26 20 / 0.4), 0 0 80px oklch(0.65 0.26 20 / 0.2)",
+        "glow-crimson": "0 0 20px oklch(0.55 0.28 15 / 0.5)",
+        "glow-crimson-lg": "0 0 40px oklch(0.55 0.28 15 / 0.3), 0 0 80px oklch(0.55 0.28 15 / 0.15)",
+        card: "0 4px 24px oklch(0 0 0 / 0.4), 0 0 0 1px oklch(0.22 0.05 15 / 0.4)",
+        "card-hover": "0 8px 40px oklch(0 0 0 / 0.5), 0 0 0 1px oklch(0.65 0.26 20 / 0.4)",
       },
       keyframes: {
         "accordion-down": {
@@ -120,9 +120,9 @@ export default {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
       },
-      backgroundImage: {
+        backgroundImage: {
         "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
-        "mesh-cyan": "radial-gradient(at 20% 50%, oklch(0.72 0.19 210 / 0.15) 0px, transparent 60%), radial-gradient(at 80% 20%, oklch(0.62 0.22 295 / 0.1) 0px, transparent 50%)",
+        "mesh-red": "radial-gradient(at 20% 50%, oklch(0.65 0.26 20 / 0.15) 0px, transparent 60%), radial-gradient(at 80% 20%, oklch(0.55 0.28 15 / 0.1) 0px, transparent 50%)",
       },
     },
   },

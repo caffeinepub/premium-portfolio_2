@@ -46,6 +46,18 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import type { ContactInfo, Project, Review } from "../backend";
 import { getBackend } from "../lib/backendClient";
+import {
+  addLocalProject,
+  addLocalReview,
+  deleteLocalProject,
+  deleteLocalReview,
+  getLocalContact,
+  getLocalProjects,
+  getLocalReviews,
+  saveLocalContact,
+  updateLocalProject,
+  updateLocalReview,
+} from "../lib/localDataStore";
 
 // ─────────────────────────────────────────
 // Auth gate
@@ -149,7 +161,7 @@ function AdminLogin({ onSuccess }: { onSuccess: () => void }) {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter password..."
                   className="bg-input/50 border-border/50 pr-10 focus:border-primary/50 focus:ring-primary/20"
-                  data-ocid="admin.password_input"
+                  data-ocid="admin.input"
                   autoComplete="current-password"
                 />
                 <button
@@ -201,6 +213,7 @@ function AdminLogin({ onSuccess }: { onSuccess: () => void }) {
             <Link
               to="/"
               className="text-sm text-muted-foreground hover:text-primary transition-colors"
+              data-ocid="admin.link"
             >
               ← Back to Portfolio
             </Link>
@@ -268,13 +281,12 @@ function ProjectDialog({
     }
   }, [project]);
 
-  const handleSave = async () => {
+  const handleSave = () => {
     if (!form.title.trim()) return;
     setSaving(true);
     try {
-      const client = await getBackend();
       if (project) {
-        await client.updateProject(
+        updateLocalProject(
           project.id,
           form.title,
           form.description,
@@ -286,7 +298,7 @@ function ProjectDialog({
         );
         toast.success("Project updated successfully");
       } else {
-        await client.addProject(
+        addLocalProject(
           form.title,
           form.description,
           form.imageUrl,
@@ -326,7 +338,7 @@ function ProjectDialog({
               onChange={(e) => setForm({ ...form, title: e.target.value })}
               placeholder="Project title"
               className="bg-input/50"
-              data-ocid="project.form_input"
+              data-ocid="project.input"
             />
           </div>
 
@@ -350,7 +362,10 @@ function ProjectDialog({
                 value={form.category}
                 onValueChange={(v) => setForm({ ...form, category: v })}
               >
-                <SelectTrigger className="bg-input/50">
+                <SelectTrigger
+                  className="bg-input/50"
+                  data-ocid="project.select"
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -401,6 +416,7 @@ function ProjectDialog({
               onCheckedChange={(v) =>
                 setForm({ ...form, featured: Boolean(v) })
               }
+              data-ocid="project.checkbox"
             />
             <Label htmlFor="featured" className="cursor-pointer">
               Featured project (show in carousel)
@@ -476,13 +492,12 @@ function ReviewDialog({ open, review, onClose, onSaved }: ReviewDialogProps) {
     }
   }, [review]);
 
-  const handleSave = async () => {
+  const handleSave = () => {
     if (!form.author.trim()) return;
     setSaving(true);
     try {
-      const client = await getBackend();
       if (review) {
-        await client.updateReview(
+        updateLocalReview(
           review.id,
           form.author,
           form.role,
@@ -492,7 +507,7 @@ function ReviewDialog({ open, review, onClose, onSaved }: ReviewDialogProps) {
         );
         toast.success("Review updated");
       } else {
-        await client.addReview(
+        addLocalReview(
           form.author,
           form.role,
           form.text,
@@ -531,7 +546,7 @@ function ReviewDialog({ open, review, onClose, onSaved }: ReviewDialogProps) {
                 onChange={(e) => setForm({ ...form, author: e.target.value })}
                 placeholder="John Smith"
                 className="bg-input/50"
-                data-ocid="review.form_input"
+                data-ocid="review.input"
               />
             </div>
             <div className="space-y-1.5">
@@ -563,7 +578,10 @@ function ReviewDialog({ open, review, onClose, onSaved }: ReviewDialogProps) {
                 value={form.rating}
                 onValueChange={(v) => setForm({ ...form, rating: v })}
               >
-                <SelectTrigger className="bg-input/50">
+                <SelectTrigger
+                  className="bg-input/50"
+                  data-ocid="review.select"
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -621,13 +639,13 @@ function ProjectsTab() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editProject, setEditProject] = useState<Project | null>(null);
-  const [deletingId, setDeletingId] = useState<bigint | null>(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(() => {
     try {
-      const client = await getBackend();
-      const data = await client.getAllProjects();
-      setProjects(data.sort((a, b) => Number(a.order) - Number(b.order)));
+      const localProjects = getLocalProjects();
+      setProjects(
+        localProjects.sort((a, b) => Number(a.order) - Number(b.order)),
+      );
     } catch {
       toast.error("Failed to load projects");
     } finally {
@@ -639,17 +657,13 @@ function ProjectsTab() {
     load();
   }, [load]);
 
-  const handleDelete = async (id: bigint) => {
-    setDeletingId(id);
+  const handleDelete = (id: bigint) => {
     try {
-      const client = await getBackend();
-      await client.deleteProject(id);
+      deleteLocalProject(id);
       toast.success("Project deleted");
       load();
     } catch {
       toast.error("Failed to delete project");
-    } finally {
-      setDeletingId(null);
     }
   };
 
@@ -689,12 +703,15 @@ function ProjectsTab() {
         >
           <LayoutDashboard className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
           <p className="text-muted-foreground">
-            No projects yet. Add your first one!
+            No projects added yet. Click "Add Project" to get started.
+          </p>
+          <p className="text-xs text-muted-foreground/60 mt-2">
+            Projects you add here will appear on your portfolio automatically.
           </p>
         </div>
       ) : (
         <div className="glass rounded-2xl overflow-hidden">
-          <Table>
+          <Table data-ocid="admin.projects.table">
             <TableHeader>
               <TableRow className="border-border/30 hover:bg-transparent">
                 <TableHead className="text-muted-foreground">Title</TableHead>
@@ -721,7 +738,8 @@ function ProjectsTab() {
                       {project.title}
                     </div>
                     <div className="text-xs text-muted-foreground truncate max-w-48 hidden sm:hidden md:block">
-                      {project.description.slice(0, 60)}...
+                      {project.description.slice(0, 60)}
+                      {project.description.length > 60 ? "..." : ""}
                     </div>
                   </TableCell>
                   <TableCell className="hidden sm:table-cell">
@@ -748,7 +766,7 @@ function ProjectsTab() {
                           setEditProject(project);
                           setDialogOpen(true);
                         }}
-                        data-ocid={`admin.project_edit_button.${i + 1}`}
+                        data-ocid={`admin.project.edit_button.${i + 1}`}
                       >
                         <Pencil className="w-3.5 h-3.5" />
                       </Button>
@@ -757,14 +775,9 @@ function ProjectsTab() {
                         variant="ghost"
                         className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
                         onClick={() => handleDelete(project.id)}
-                        disabled={deletingId === project.id}
-                        data-ocid={`admin.project_delete_button.${i + 1}`}
+                        data-ocid={`admin.project.delete_button.${i + 1}`}
                       >
-                        {deletingId === project.id ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <Trash2 className="w-3.5 h-3.5" />
-                        )}
+                        <Trash2 className="w-3.5 h-3.5" />
                       </Button>
                     </div>
                   </TableCell>
@@ -793,13 +806,11 @@ function ReviewsTab() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editReview, setEditReview] = useState<Review | null>(null);
-  const [deletingId, setDeletingId] = useState<bigint | null>(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(() => {
     try {
-      const client = await getBackend();
-      const data = await client.getAllReviews();
-      setReviews(data);
+      const localReviews = getLocalReviews();
+      setReviews(localReviews);
     } catch {
       toast.error("Failed to load reviews");
     } finally {
@@ -811,17 +822,13 @@ function ReviewsTab() {
     load();
   }, [load]);
 
-  const handleDelete = async (id: bigint) => {
-    setDeletingId(id);
+  const handleDelete = (id: bigint) => {
     try {
-      const client = await getBackend();
-      await client.deleteReview(id);
+      deleteLocalReview(id);
       toast.success("Review deleted");
       load();
     } catch {
       toast.error("Failed to delete review");
-    } finally {
-      setDeletingId(null);
     }
   };
 
@@ -860,11 +867,14 @@ function ReviewsTab() {
           data-ocid="admin.reviews.empty_state"
         >
           <Star className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
-          <p className="text-muted-foreground">No reviews yet.</p>
+          <p className="text-muted-foreground">No reviews added yet.</p>
+          <p className="text-xs text-muted-foreground/60 mt-2">
+            Reviews you add here will appear on your portfolio automatically.
+          </p>
         </div>
       ) : (
         <div className="glass rounded-2xl overflow-hidden">
-          <Table>
+          <Table data-ocid="admin.reviews.table">
             <TableHeader>
               <TableRow className="border-border/30 hover:bg-transparent">
                 <TableHead className="text-muted-foreground">Author</TableHead>
@@ -906,7 +916,8 @@ function ReviewsTab() {
                   </TableCell>
                   <TableCell className="hidden md:table-cell">
                     <span className="text-xs text-muted-foreground line-clamp-1 max-w-48">
-                      {review.text.slice(0, 60)}...
+                      {review.text.slice(0, 60)}
+                      {review.text.length > 60 ? "..." : ""}
                     </span>
                   </TableCell>
                   <TableCell className="text-right">
@@ -919,7 +930,7 @@ function ReviewsTab() {
                           setEditReview(review);
                           setDialogOpen(true);
                         }}
-                        data-ocid={`admin.review_edit_button.${i + 1}`}
+                        data-ocid={`admin.review.edit_button.${i + 1}`}
                       >
                         <Pencil className="w-3.5 h-3.5" />
                       </Button>
@@ -928,14 +939,9 @@ function ReviewsTab() {
                         variant="ghost"
                         className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
                         onClick={() => handleDelete(review.id)}
-                        disabled={deletingId === review.id}
-                        data-ocid={`admin.review_delete_button.${i + 1}`}
+                        data-ocid={`admin.review.delete_button.${i + 1}`}
                       >
-                        {deletingId === review.id ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <Trash2 className="w-3.5 h-3.5" />
-                        )}
+                        <Trash2 className="w-3.5 h-3.5" />
                       </Button>
                     </div>
                   </TableCell>
@@ -975,11 +981,19 @@ function ContactTab() {
   useEffect(() => {
     const load = async () => {
       try {
+        // Try localStorage first
+        const localContact = getLocalContact();
+        if (localContact) {
+          setForm(localContact);
+          setLoading(false);
+          return;
+        }
+        // Fall back to backend
         const client = await getBackend();
         const data = await client.getContactInfo();
         if (data) setForm(data);
       } catch {
-        toast.error("Failed to load contact info");
+        // Backend failed, use whatever we have
       } finally {
         setLoading(false);
       }
@@ -987,20 +1001,11 @@ function ContactTab() {
     load();
   }, []);
 
-  const handleSave = async () => {
+  const handleSave = () => {
     setSaving(true);
     try {
-      const client = await getBackend();
-      await client.setContactInfo(
-        form.name,
-        form.title,
-        form.bio,
-        form.email,
-        form.github,
-        form.linkedin,
-        form.twitter,
-      );
-      toast.success("Contact info saved");
+      saveLocalContact(form);
+      toast.success("Contact info saved successfully!");
     } catch {
       toast.error("Failed to save contact info");
     } finally {
@@ -1039,6 +1044,7 @@ function ContactTab() {
               onChange={(e) => setForm({ ...form, name: e.target.value })}
               placeholder="Your name"
               className="bg-input/50"
+              data-ocid="contact.name.input"
             />
           </div>
           <div className="space-y-1.5">
@@ -1048,6 +1054,7 @@ function ContactTab() {
               onChange={(e) => setForm({ ...form, title: e.target.value })}
               placeholder="Your professional title"
               className="bg-input/50"
+              data-ocid="contact.title.input"
             />
           </div>
         </div>
@@ -1060,6 +1067,7 @@ function ContactTab() {
             placeholder="Tell the world about yourself..."
             className="bg-input/50 resize-none"
             rows={4}
+            data-ocid="contact.bio.textarea"
           />
         </div>
 
@@ -1072,6 +1080,7 @@ function ContactTab() {
               placeholder="you@example.com"
               className="bg-input/50"
               type="email"
+              data-ocid="contact.email.input"
             />
           </div>
           <div className="space-y-1.5">
@@ -1081,6 +1090,7 @@ function ContactTab() {
               onChange={(e) => setForm({ ...form, github: e.target.value })}
               placeholder="yourusername"
               className="bg-input/50"
+              data-ocid="contact.github.input"
             />
           </div>
           <div className="space-y-1.5">
@@ -1090,6 +1100,7 @@ function ContactTab() {
               onChange={(e) => setForm({ ...form, linkedin: e.target.value })}
               placeholder="yourusername"
               className="bg-input/50"
+              data-ocid="contact.linkedin.input"
             />
           </div>
           <div className="space-y-1.5">
@@ -1099,6 +1110,7 @@ function ContactTab() {
               onChange={(e) => setForm({ ...form, twitter: e.target.value })}
               placeholder="yourusername"
               className="bg-input/50"
+              data-ocid="contact.twitter.input"
             />
           </div>
         </div>
@@ -1108,7 +1120,7 @@ function ContactTab() {
             onClick={handleSave}
             disabled={saving}
             className="bg-primary text-primary-foreground hover:shadow-glow px-6"
-            data-ocid="admin.contact_save_button"
+            data-ocid="admin.contact.save_button"
           >
             {saving ? <Loader2 className="mr-2 w-4 h-4 animate-spin" /> : null}
             {saving ? "Saving..." : "Save Contact Info"}
@@ -1149,6 +1161,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             <Link
               to="/"
               className="hidden sm:flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors"
+              data-ocid="admin.portfolio.link"
             >
               <Eye className="w-4 h-4" />
               View Portfolio
@@ -1158,6 +1171,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
               size="sm"
               onClick={onLogout}
               className="text-muted-foreground hover:text-destructive gap-1.5"
+              data-ocid="admin.logout.button"
             >
               <LogOut className="w-4 h-4" />
               <span className="hidden sm:inline">Logout</span>
@@ -1172,7 +1186,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             <TabsTrigger
               value="projects"
               className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary rounded-md px-5 py-2.5 text-sm font-medium gap-2"
-              data-ocid="admin.projects_tab"
+              data-ocid="admin.projects.tab"
             >
               <LayoutDashboard className="w-4 h-4" />
               Projects
@@ -1180,7 +1194,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             <TabsTrigger
               value="reviews"
               className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary rounded-md px-5 py-2.5 text-sm font-medium gap-2"
-              data-ocid="admin.reviews_tab"
+              data-ocid="admin.reviews.tab"
             >
               <Star className="w-4 h-4" />
               Reviews
@@ -1188,7 +1202,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             <TabsTrigger
               value="contact"
               className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary rounded-md px-5 py-2.5 text-sm font-medium gap-2"
-              data-ocid="admin.contact_tab"
+              data-ocid="admin.contact.tab"
             >
               <User className="w-4 h-4" />
               Contact Info

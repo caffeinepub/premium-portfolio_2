@@ -159,23 +159,23 @@ export default function HeroSection({
       id="hero"
       className="relative min-h-screen flex items-center justify-center overflow-hidden"
     >
-      {/* Background image */}
+      {/* Pure black background with red neon gradients */}
       <div
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+        className="absolute inset-0"
         style={{
-          backgroundImage: "url('/assets/generated/hero-bg.dim_1920x1080.jpg')",
+          background: "oklch(0.06 0.01 15)",
         }}
       />
-      {/* Dark overlay with red tint */}
-      <div className="absolute inset-0 bg-gradient-to-b from-background/80 via-background/60 to-background" />
-      {/* Red glow overlay */}
+      {/* Red neon gradient overlays */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
           background:
-            "radial-gradient(ellipse 70% 60% at 50% 40%, oklch(0.65 0.26 20 / 0.08) 0%, transparent 70%)",
+            "radial-gradient(ellipse 80% 60% at 50% 30%, oklch(0.65 0.26 20 / 0.12) 0%, transparent 65%), radial-gradient(ellipse 50% 40% at 20% 70%, oklch(0.55 0.28 15 / 0.08) 0%, transparent 60%), radial-gradient(ellipse 40% 50% at 80% 60%, oklch(0.65 0.26 20 / 0.07) 0%, transparent 60%)",
         }}
       />
+      {/* Bottom fade to background */}
+      <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-background to-transparent" />
 
       {/* Particle canvas */}
       <ParticleCanvas />

@@ -13,6 +13,11 @@ import {
   sampleReviews,
 } from "../data/sampleData";
 import { getBackend } from "../lib/backendClient";
+import {
+  getLocalContact,
+  getLocalProjects,
+  getLocalReviews,
+} from "../lib/localDataStore";
 
 export default function PortfolioPage() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -23,30 +28,59 @@ export default function PortfolioPage() {
 
   useEffect(() => {
     const loadData = async () => {
+      // Load localStorage data first (synchronous)
+      const localProjects = getLocalProjects();
+      const localReviews = getLocalReviews();
+      const localContact = getLocalContact();
+
       try {
         const client = await getBackend();
-        const [allProjects, featured, allReviews, contactInfo] =
-          await Promise.all([
-            client.getAllProjects(),
-            client.getFeaturedProjects(),
-            client.getAllReviews(),
-            client.getContactInfo(),
-          ]);
+        const [allProjects, allReviews, contactInfo] = await Promise.all([
+          client.getAllProjects().catch(() => [] as Project[]),
+          client.getAllReviews().catch(() => [] as Review[]),
+          client.getContactInfo().catch(() => null),
+        ]);
 
-        setProjects(allProjects.length > 0 ? allProjects : sampleProjects);
-        setFeaturedProjects(
-          featured.length > 0
-            ? featured
-            : sampleProjects.filter((p) => p.featured),
-        );
-        setReviews(allReviews.length > 0 ? allReviews : sampleReviews);
-        setContact(contactInfo ?? sampleContactInfo);
+        // Merge: localStorage projects take priority (shown first), then backend
+        const backendProjects =
+          allProjects.length > 0 ? allProjects : sampleProjects;
+        const mergedProjects =
+          localProjects.length > 0
+            ? [
+                ...localProjects,
+                ...backendProjects.filter(
+                  (bp) => !localProjects.find((lp) => lp.id === bp.id),
+                ),
+              ]
+            : backendProjects;
+
+        setProjects(mergedProjects);
+        setFeaturedProjects(mergedProjects.filter((p) => p.featured));
+
+        // Merge reviews
+        const backendReviews =
+          allReviews.length > 0 ? allReviews : sampleReviews;
+        const mergedReviews =
+          localReviews.length > 0
+            ? [
+                ...localReviews,
+                ...backendReviews.filter(
+                  (br) => !localReviews.find((lr) => lr.id === br.id),
+                ),
+              ]
+            : backendReviews;
+        setReviews(mergedReviews);
+
+        // Contact: localStorage takes priority
+        setContact(localContact ?? contactInfo ?? sampleContactInfo);
       } catch {
-        // Use sample data on error
-        setProjects(sampleProjects);
-        setFeaturedProjects(sampleProjects.filter((p) => p.featured));
-        setReviews(sampleReviews);
-        setContact(sampleContactInfo);
+        // Backend failed entirely — use localStorage + sample data
+        const fallbackProjects =
+          localProjects.length > 0 ? localProjects : sampleProjects;
+        setProjects(fallbackProjects);
+        setFeaturedProjects(fallbackProjects.filter((p) => p.featured));
+        setReviews(localReviews.length > 0 ? localReviews : sampleReviews);
+        setContact(localContact ?? sampleContactInfo);
       } finally {
         setLoading(false);
       }
