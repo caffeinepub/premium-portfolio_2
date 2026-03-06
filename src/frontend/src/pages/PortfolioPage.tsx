@@ -14,10 +14,12 @@ import {
 } from "../data/sampleData";
 import { getBackend } from "../lib/backendClient";
 import {
+  type SocialSettings,
   getLocalContact,
   getLocalDesignSettings,
   getLocalProjects,
   getLocalReviews,
+  getSocialSettings,
 } from "../lib/localDataStore";
 
 export default function PortfolioPage() {
@@ -25,6 +27,7 @@ export default function PortfolioPage() {
   const [featuredProjects, setFeaturedProjects] = useState<Project[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [contact, setContact] = useState<ContactInfo | null>(null);
+  const [social, setSocial] = useState<SocialSettings>({});
   const [loading, setLoading] = useState(true);
 
   // Apply design settings (font, animation) to document root
@@ -51,6 +54,7 @@ export default function PortfolioPage() {
       const localProjects = getLocalProjects();
       const localReviews = getLocalReviews();
       const localContact = getLocalContact();
+      setSocial(getSocialSettings());
 
       try {
         const client = await getBackend();
@@ -136,7 +140,7 @@ export default function PortfolioPage() {
               <ReviewsSection reviews={reviews} />
             )}
             {designSettings.sections.contact && (
-              <ContactSection contact={contact} />
+              <ContactSection contact={contact} social={social} />
             )}
           </>
         )}

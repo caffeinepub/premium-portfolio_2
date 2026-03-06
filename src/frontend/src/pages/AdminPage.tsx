@@ -41,6 +41,7 @@ import {
   Palette,
   Pencil,
   Plus,
+  RefreshCw,
   Sparkles,
   Star,
   Trash2,
@@ -49,15 +50,18 @@ import {
   Zap,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { ContactInfo, Project, Review } from "../backend";
 import {
   type CustomSkill,
   DEFAULT_DESIGN_SETTINGS,
   DEFAULT_HERO_SETTINGS,
+  DEFAULT_SOCIAL_SETTINGS,
   type DesignSettings,
   type HeroSettings,
+  type ProjectExtras,
+  type SocialSettings,
   addLocalProject,
   addLocalReview,
   deleteLocalProject,
@@ -68,12 +72,16 @@ import {
   getLocalHeroSettings,
   getLocalProjects,
   getLocalReviews,
+  getProjectExtra,
+  getSocialSettings,
   saveLocalContact,
   saveLocalCustomSkills,
   saveLocalDesignSettings,
   saveLocalHeroSettings,
+  saveSocialSettings,
   updateLocalProject,
   updateLocalReview,
+  upsertProjectExtra,
 } from "../lib/localDataStore";
 
 // ─────────────────────────────────────────
@@ -246,6 +254,10 @@ interface ProjectFormData {
   link: string;
   featured: boolean;
   order: string;
+  // extras
+  techTags: string;
+  status: "completed" | "in-progress" | "concept";
+  year: string;
 }
 
 const EMPTY_PROJECT: ProjectFormData = {
@@ -256,9 +268,22 @@ const EMPTY_PROJECT: ProjectFormData = {
   link: "",
   featured: false,
   order: "0",
+  techTags: "",
+  status: "completed",
+  year: new Date().getFullYear().toString(),
 };
 
 const CATEGORIES = ["Web Dev", "Design", "AI", "Editing"];
+
+const STATUS_OPTIONS: {
+  value: ProjectFormData["status"];
+  label: string;
+  color: string;
+}[] = [
+  { value: "completed", label: "Completed", color: "oklch(0.70 0.18 145)" },
+  { value: "in-progress", label: "In Progress", color: "oklch(0.72 0.20 65)" },
+  { value: "concept", label: "Concept", color: "oklch(0.65 0.05 220)" },
+];
 
 interface ProjectDialogProps {
   open: boolean;
@@ -278,6 +303,7 @@ function ProjectDialog({
 
   useEffect(() => {
     if (project) {
+      const extras = getProjectExtra(project.id.toString());
       setForm({
         title: project.title,
         description: project.description,
@@ -286,16 +312,25 @@ function ProjectDialog({
         link: project.link,
         featured: project.featured,
         order: project.order.toString(),
+        techTags: extras?.techTags?.join(", ") ?? "",
+        status: extras?.status ?? "completed",
+        year: extras?.year ?? new Date().getFullYear().toString(),
       });
     } else {
       setForm(EMPTY_PROJECT);
     }
   }, [project]);
 
+  const techTagsPreview = form.techTags
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean);
+
   const handleSave = () => {
     if (!form.title.trim()) return;
     setSaving(true);
     try {
+      let savedId: bigint;
       if (project) {
         updateLocalProject(
           project.id,
@@ -307,9 +342,10 @@ function ProjectDialog({
           form.featured,
           BigInt(Number.parseInt(form.order) || 0),
         );
+        savedId = project.id;
         toast.success("Project updated successfully");
       } else {
-        addLocalProject(
+        const newProject = addLocalProject(
           form.title,
           form.description,
           form.imageUrl,
@@ -318,8 +354,22 @@ function ProjectDialog({
           form.featured,
           BigInt(Number.parseInt(form.order) || 0),
         );
+        savedId = newProject.id;
         toast.success("Project added successfully");
       }
+
+      // Save extras
+      const extras: ProjectExtras = {
+        id: savedId.toString(),
+        techTags: form.techTags
+          .split(",")
+          .map((t) => t.trim())
+          .filter(Boolean),
+        status: form.status,
+        year: form.year,
+      };
+      upsertProjectExtra(extras);
+
       onSaved();
       onClose();
     } catch {
@@ -332,7 +382,7 @@ function ProjectDialog({
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent
-        className="glass-strong max-w-lg border-border/50"
+        className="glass-strong max-w-lg border-border/50 max-h-[90vh] overflow-y-auto"
         data-ocid="admin.project.dialog"
       >
         <DialogHeader>
@@ -389,6 +439,48 @@ function ProjectDialog({
               </Select>
             </div>
             <div className="space-y-1.5">
+              <Label>Status</Label>
+              <Select
+                value={form.status}
+                onValueChange={(v) =>
+                  setForm({ ...form, status: v as ProjectFormData["status"] })
+                }
+              >
+                <SelectTrigger
+                  className="bg-input/50"
+                  data-ocid="project.status.select"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {STATUS_OPTIONS.map((s) => (
+                    <SelectItem key={s.value} value={s.value}>
+                      <span className="flex items-center gap-2">
+                        <span
+                          className="w-2 h-2 rounded-full inline-block"
+                          style={{ backgroundColor: s.color }}
+                        />
+                        {s.label}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Year</Label>
+              <Input
+                value={form.year}
+                onChange={(e) => setForm({ ...form, year: e.target.value })}
+                placeholder="2024"
+                className="bg-input/50"
+                data-ocid="project.year.input"
+              />
+            </div>
+            <div className="space-y-1.5">
               <Label>Order</Label>
               <Input
                 type="number"
@@ -398,6 +490,34 @@ function ProjectDialog({
                 min="0"
               />
             </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Tech Tags</Label>
+            <Input
+              value={form.techTags}
+              onChange={(e) => setForm({ ...form, techTags: e.target.value })}
+              placeholder="React, Node.js, Figma"
+              className="bg-input/50"
+              data-ocid="project.tags.input"
+            />
+            {techTagsPreview.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {techTagsPreview.map((tag) => (
+                  <span
+                    key={tag}
+                    className="text-xs px-2 py-0.5 rounded-full"
+                    style={{
+                      background: "oklch(0.65 0.26 20 / 0.15)",
+                      border: "1px solid oklch(0.65 0.26 20 / 0.3)",
+                      color: "oklch(0.78 0.22 22)",
+                    }}
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="space-y-1.5">
@@ -643,9 +763,53 @@ function ReviewDialog({ open, review, onClose, onSaved }: ReviewDialogProps) {
 }
 
 // ─────────────────────────────────────────
+// Status Badge helper
+// ─────────────────────────────────────────
+function StatusBadge({ status }: { status: ProjectExtras["status"] }) {
+  const map = {
+    completed: {
+      label: "Completed",
+      color: "oklch(0.70 0.18 145)",
+      bg: "oklch(0.70 0.18 145 / 0.12)",
+    },
+    "in-progress": {
+      label: "In Progress",
+      color: "oklch(0.72 0.20 65)",
+      bg: "oklch(0.72 0.20 65 / 0.12)",
+    },
+    concept: {
+      label: "Concept",
+      color: "oklch(0.65 0.05 220)",
+      bg: "oklch(0.65 0.05 220 / 0.12)",
+    },
+  };
+  const s = map[status];
+  return (
+    <span
+      className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium"
+      style={{
+        background: s.bg,
+        color: s.color,
+        border: `1px solid ${s.color.replace(")", " / 0.3)")}`,
+      }}
+    >
+      <span
+        className="w-1.5 h-1.5 rounded-full"
+        style={{ background: s.color }}
+      />
+      {s.label}
+    </span>
+  );
+}
+
+// ─────────────────────────────────────────
 // Projects Tab
 // ─────────────────────────────────────────
-function ProjectsTab() {
+interface ProjectsTabProps {
+  onSaved?: () => void;
+}
+
+function ProjectsTab({ onSaved }: ProjectsTabProps) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -673,6 +837,7 @@ function ProjectsTab() {
       deleteLocalProject(id);
       toast.success("Project deleted");
       load();
+      onSaved?.();
     } catch {
       toast.error("Failed to delete project");
     }
@@ -730,6 +895,12 @@ function ProjectsTab() {
                   Category
                 </TableHead>
                 <TableHead className="text-muted-foreground hidden md:table-cell">
+                  Status
+                </TableHead>
+                <TableHead className="text-muted-foreground hidden lg:table-cell">
+                  Tags
+                </TableHead>
+                <TableHead className="text-muted-foreground hidden md:table-cell">
                   Featured
                 </TableHead>
                 <TableHead className="text-muted-foreground text-right">
@@ -738,62 +909,102 @@ function ProjectsTab() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {projects.map((project, i) => (
-                <TableRow
-                  key={project.id.toString()}
-                  className="border-border/20 hover:bg-white/3 transition-colors"
-                  data-ocid={`admin.project.row.${i + 1}`}
-                >
-                  <TableCell>
-                    <div className="font-medium text-sm truncate max-w-48">
-                      {project.title}
-                    </div>
-                    <div className="text-xs text-muted-foreground truncate max-w-48 hidden sm:hidden md:block">
-                      {project.description.slice(0, 60)}
-                      {project.description.length > 60 ? "..." : ""}
-                    </div>
-                  </TableCell>
-                  <TableCell className="hidden sm:table-cell">
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/20">
-                      {project.category}
-                    </span>
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell">
-                    {project.featured ? (
-                      <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                    ) : (
-                      <span className="text-muted-foreground/40 text-sm">
-                        —
+              {projects.map((project, i) => {
+                const extras = getProjectExtra(project.id.toString());
+                return (
+                  <TableRow
+                    key={project.id.toString()}
+                    className="border-border/20 hover:bg-white/3 transition-colors"
+                    data-ocid={`admin.project.row.${i + 1}`}
+                  >
+                    <TableCell>
+                      <div className="font-medium text-sm truncate max-w-40">
+                        {project.title}
+                      </div>
+                      {extras?.year && (
+                        <div className="text-xs text-muted-foreground/60 mt-0.5">
+                          {extras.year}
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell className="hidden sm:table-cell">
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/20">
+                        {project.category}
                       </span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-8 w-8 p-0 hover:bg-primary/10 hover:text-primary"
-                        onClick={() => {
-                          setEditProject(project);
-                          setDialogOpen(true);
-                        }}
-                        data-ocid={`admin.project.edit_button.${i + 1}`}
-                      >
-                        <Pencil className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
-                        onClick={() => handleDelete(project.id)}
-                        data-ocid={`admin.project.delete_button.${i + 1}`}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      {extras?.status ? (
+                        <StatusBadge status={extras.status} />
+                      ) : (
+                        <span className="text-muted-foreground/40 text-sm">
+                          —
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell className="hidden lg:table-cell">
+                      {extras?.techTags && extras.techTags.length > 0 ? (
+                        <div className="flex gap-1 flex-wrap">
+                          {extras.techTags.slice(0, 2).map((tag) => (
+                            <span
+                              key={tag}
+                              className="text-xs px-1.5 py-0.5 rounded"
+                              style={{
+                                background: "oklch(0.65 0.26 20 / 0.1)",
+                                color: "oklch(0.75 0.18 22)",
+                              }}
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                          {extras.techTags.length > 2 && (
+                            <span className="text-xs text-muted-foreground/60">
+                              +{extras.techTags.length - 2}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground/40 text-sm">
+                          —
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      {project.featured ? (
+                        <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                      ) : (
+                        <span className="text-muted-foreground/40 text-sm">
+                          —
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0 hover:bg-primary/10 hover:text-primary"
+                          onClick={() => {
+                            setEditProject(project);
+                            setDialogOpen(true);
+                          }}
+                          data-ocid={`admin.project.edit_button.${i + 1}`}
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
+                          onClick={() => handleDelete(project.id)}
+                          data-ocid={`admin.project.delete_button.${i + 1}`}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </div>
@@ -803,7 +1014,10 @@ function ProjectsTab() {
         open={dialogOpen}
         project={editProject}
         onClose={() => setDialogOpen(false)}
-        onSaved={load}
+        onSaved={() => {
+          load();
+          onSaved?.();
+        }}
       />
     </div>
   );
@@ -812,7 +1026,11 @@ function ProjectsTab() {
 // ─────────────────────────────────────────
 // Reviews Tab
 // ─────────────────────────────────────────
-function ReviewsTab() {
+interface ReviewsTabProps {
+  onSaved?: () => void;
+}
+
+function ReviewsTab({ onSaved }: ReviewsTabProps) {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -838,6 +1056,7 @@ function ReviewsTab() {
       deleteLocalReview(id);
       toast.success("Review deleted");
       load();
+      onSaved?.();
     } catch {
       toast.error("Failed to delete review");
     }
@@ -967,16 +1186,23 @@ function ReviewsTab() {
         open={dialogOpen}
         review={editReview}
         onClose={() => setDialogOpen(false)}
-        onSaved={load}
+        onSaved={() => {
+          load();
+          onSaved?.();
+        }}
       />
     </div>
   );
 }
 
 // ─────────────────────────────────────────
-// Contact Tab
+// Contact Tab (with Social Media)
 // ─────────────────────────────────────────
-function ContactTab() {
+interface ContactTabProps {
+  onSaved?: () => void;
+}
+
+function ContactTab({ onSaved }: ContactTabProps) {
   const [form, setForm] = useState<ContactInfo>({
     name: "",
     title: "",
@@ -986,6 +1212,9 @@ function ContactTab() {
     linkedin: "",
     twitter: "",
   });
+  const [social, setSocial] = useState<SocialSettings>({
+    ...DEFAULT_SOCIAL_SETTINGS,
+  });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -994,6 +1223,7 @@ function ContactTab() {
     if (localContact) {
       setForm(localContact);
     }
+    setSocial(getSocialSettings());
     setLoading(false);
   }, []);
 
@@ -1001,7 +1231,9 @@ function ContactTab() {
     setSaving(true);
     try {
       saveLocalContact(form);
-      toast.success("Contact info saved successfully!");
+      saveSocialSettings(social);
+      toast.success("Contact info & social media saved!");
+      onSaved?.();
     } catch {
       toast.error("Failed to save contact info");
     } finally {
@@ -1031,83 +1263,203 @@ function ContactTab() {
         </div>
       </div>
 
-      <div className="glass rounded-2xl p-6 space-y-5">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="space-y-5">
+        {/* Basic Info */}
+        <div className="glass rounded-2xl p-6 space-y-5">
+          <h3 className="font-semibold text-sm flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+            Basic Information
+          </h3>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label>Name</Label>
+              <Input
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                placeholder="Your name"
+                className="bg-input/50"
+                data-ocid="contact.name.input"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Title</Label>
+              <Input
+                value={form.title}
+                onChange={(e) => setForm({ ...form, title: e.target.value })}
+                placeholder="Your professional title"
+                className="bg-input/50"
+                data-ocid="contact.title.input"
+              />
+            </div>
+          </div>
+
           <div className="space-y-1.5">
-            <Label>Name</Label>
-            <Input
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              placeholder="Your name"
-              className="bg-input/50"
-              data-ocid="contact.name.input"
+            <Label>Bio</Label>
+            <Textarea
+              value={form.bio}
+              onChange={(e) => setForm({ ...form, bio: e.target.value })}
+              placeholder="Tell the world about yourself..."
+              className="bg-input/50 resize-none"
+              rows={4}
+              data-ocid="contact.bio.textarea"
             />
           </div>
-          <div className="space-y-1.5">
-            <Label>Title</Label>
-            <Input
-              value={form.title}
-              onChange={(e) => setForm({ ...form, title: e.target.value })}
-              placeholder="Your professional title"
-              className="bg-input/50"
-              data-ocid="contact.title.input"
-            />
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label>Email</Label>
+              <Input
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                placeholder="you@example.com"
+                className="bg-input/50"
+                type="email"
+                data-ocid="contact.email.input"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>GitHub Username</Label>
+              <Input
+                value={form.github}
+                onChange={(e) => setForm({ ...form, github: e.target.value })}
+                placeholder="yourusername"
+                className="bg-input/50"
+                data-ocid="contact.github.input"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>LinkedIn Username</Label>
+              <Input
+                value={form.linkedin}
+                onChange={(e) => setForm({ ...form, linkedin: e.target.value })}
+                placeholder="yourusername"
+                className="bg-input/50"
+                data-ocid="contact.linkedin.input"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Twitter / X Username</Label>
+              <Input
+                value={form.twitter}
+                onChange={(e) => setForm({ ...form, twitter: e.target.value })}
+                placeholder="yourusername"
+                className="bg-input/50"
+                data-ocid="contact.twitter.input"
+              />
+            </div>
           </div>
         </div>
 
-        <div className="space-y-1.5">
-          <Label>Bio</Label>
-          <Textarea
-            value={form.bio}
-            onChange={(e) => setForm({ ...form, bio: e.target.value })}
-            placeholder="Tell the world about yourself..."
-            className="bg-input/50 resize-none"
-            rows={4}
-            data-ocid="contact.bio.textarea"
-          />
-        </div>
+        {/* Social Media */}
+        <div className="glass rounded-2xl p-6 space-y-5">
+          <h3 className="font-semibold text-sm flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+            Social Media
+            <span className="text-xs text-muted-foreground font-normal">
+              (additional platforms)
+            </span>
+          </h3>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="space-y-1.5">
-            <Label>Email</Label>
-            <Input
-              value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
-              placeholder="you@example.com"
-              className="bg-input/50"
-              type="email"
-              data-ocid="contact.email.input"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label>GitHub Username</Label>
-            <Input
-              value={form.github}
-              onChange={(e) => setForm({ ...form, github: e.target.value })}
-              placeholder="yourusername"
-              className="bg-input/50"
-              data-ocid="contact.github.input"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label>LinkedIn Username</Label>
-            <Input
-              value={form.linkedin}
-              onChange={(e) => setForm({ ...form, linkedin: e.target.value })}
-              placeholder="yourusername"
-              className="bg-input/50"
-              data-ocid="contact.linkedin.input"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Twitter / X Username</Label>
-            <Input
-              value={form.twitter}
-              onChange={(e) => setForm({ ...form, twitter: e.target.value })}
-              placeholder="yourusername"
-              className="bg-input/50"
-              data-ocid="contact.twitter.input"
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-2">
+                <span
+                  className="w-4 h-4 rounded-sm flex items-center justify-center text-[10px]"
+                  style={{
+                    background:
+                      "linear-gradient(135deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888)",
+                  }}
+                >
+                  📷
+                </span>
+                Instagram Handle
+              </Label>
+              <Input
+                value={social.instagram ?? ""}
+                onChange={(e) =>
+                  setSocial({ ...social, instagram: e.target.value })
+                }
+                placeholder="@username"
+                className="bg-input/50"
+                data-ocid="contact.instagram.input"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-2">
+                <span className="text-sm">▶️</span>
+                YouTube Channel
+              </Label>
+              <Input
+                value={social.youtube ?? ""}
+                onChange={(e) =>
+                  setSocial({ ...social, youtube: e.target.value })
+                }
+                placeholder="channel name or URL"
+                className="bg-input/50"
+                data-ocid="contact.youtube.input"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-2">
+                <span className="text-sm">🎨</span>
+                Behance Username
+              </Label>
+              <Input
+                value={social.behance ?? ""}
+                onChange={(e) =>
+                  setSocial({ ...social, behance: e.target.value })
+                }
+                placeholder="yourusername"
+                className="bg-input/50"
+                data-ocid="contact.behance.input"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-2">
+                <span className="text-sm">🏀</span>
+                Dribbble Username
+              </Label>
+              <Input
+                value={social.dribbble ?? ""}
+                onChange={(e) =>
+                  setSocial({ ...social, dribbble: e.target.value })
+                }
+                placeholder="yourusername"
+                className="bg-input/50"
+                data-ocid="contact.dribbble.input"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-2">
+                <span className="text-sm">💬</span>
+                Discord Username
+              </Label>
+              <Input
+                value={social.discord ?? ""}
+                onChange={(e) =>
+                  setSocial({ ...social, discord: e.target.value })
+                }
+                placeholder="user#1234 or username"
+                className="bg-input/50"
+                data-ocid="contact.discord.input"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-2">
+                <span className="text-sm">📱</span>
+                WhatsApp Number
+              </Label>
+              <Input
+                value={social.whatsapp ?? ""}
+                onChange={(e) =>
+                  setSocial({ ...social, whatsapp: e.target.value })
+                }
+                placeholder="+91XXXXXXXXXX"
+                className="bg-input/50"
+                data-ocid="contact.whatsapp.input"
+              />
+            </div>
           </div>
         </div>
 
@@ -1119,7 +1471,7 @@ function ContactTab() {
             data-ocid="admin.contact.save_button"
           >
             {saving ? <Loader2 className="mr-2 w-4 h-4 animate-spin" /> : null}
-            {saving ? "Saving..." : "Save Contact Info"}
+            {saving ? "Saving..." : "Save Contact & Social"}
           </Button>
         </div>
       </div>
@@ -1130,7 +1482,11 @@ function ContactTab() {
 // ─────────────────────────────────────────
 // Hero Tab
 // ─────────────────────────────────────────
-function HeroTab() {
+interface HeroTabProps {
+  onSaved?: () => void;
+}
+
+function HeroTab({ onSaved }: HeroTabProps) {
   const [form, setForm] = useState<HeroSettings>(DEFAULT_HERO_SETTINGS);
   const [saving, setSaving] = useState(false);
 
@@ -1152,9 +1508,8 @@ function HeroTab() {
     setSaving(true);
     try {
       saveLocalHeroSettings(form);
-      toast.success(
-        "Hero settings saved! Reload the portfolio to see changes.",
-      );
+      toast.success("Hero settings saved!");
+      onSaved?.();
     } catch {
       toast.error("Failed to save hero settings");
     } finally {
@@ -1247,7 +1602,7 @@ function HeroTab() {
           <Label>Stats Row</Label>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {form.stats.map((stat, i) => (
-              // biome-ignore lint/suspicious/noArrayIndexKey: stats are positional, order never changes
+              // biome-ignore lint/suspicious/noArrayIndexKey: stats are positional
               <div key={i} className="glass rounded-xl p-3 space-y-2">
                 <p className="text-xs text-muted-foreground font-medium">
                   Stat {i + 1}
@@ -1316,7 +1671,11 @@ const COLOR_PRESETS = [
   { label: "Green", hue: 145, color: "oklch(0.60 0.22 145)" },
 ];
 
-function DesignTab() {
+interface DesignTabProps {
+  onSaved?: () => void;
+}
+
+function DesignTab({ onSaved }: DesignTabProps) {
   const [form, setForm] = useState<DesignSettings>(DEFAULT_DESIGN_SETTINGS);
   const [saving, setSaving] = useState(false);
 
@@ -1328,9 +1687,8 @@ function DesignTab() {
     setSaving(true);
     try {
       saveLocalDesignSettings(form);
-      toast.success(
-        "Design settings saved! Reload the portfolio to see changes.",
-      );
+      toast.success("Design settings saved!");
+      onSaved?.();
     } catch {
       toast.error("Failed to save design settings");
     } finally {
@@ -1404,7 +1762,6 @@ function DesignTab() {
             <span className="w-1.5 h-1.5 rounded-full bg-primary" />
             Accent Color
           </h3>
-          {/* Color preview */}
           <div className="flex items-center gap-4">
             <div
               className="w-12 h-12 rounded-xl border border-border/30 flex-shrink-0"
@@ -1431,7 +1788,6 @@ function DesignTab() {
               />
             </div>
           </div>
-          {/* Color presets */}
           <div className="flex flex-wrap gap-2">
             {COLOR_PRESETS.map((preset) => (
               <button
@@ -1626,7 +1982,11 @@ const DEFAULT_SKILLS = [
 
 const SKILL_CATEGORIES = ["Languages", "Frameworks", "Tools", "Design"];
 
-function SkillsTab() {
+interface SkillsTabProps {
+  onSaved?: () => void;
+}
+
+function SkillsTab({ onSaved }: SkillsTabProps) {
   const [customSkills, setCustomSkills] = useState<CustomSkill[]>([]);
   const [newSkill, setNewSkill] = useState({
     name: "",
@@ -1652,6 +2012,7 @@ function SkillsTab() {
     saveLocalCustomSkills(updated);
     setNewSkill({ name: "", category: "Languages", level: "3" });
     toast.success("Skill added");
+    onSaved?.();
   };
 
   const handleDeleteSkill = (id: string) => {
@@ -1659,6 +2020,7 @@ function SkillsTab() {
     setCustomSkills(updated);
     saveLocalCustomSkills(updated);
     toast.success("Skill removed");
+    onSaved?.();
   };
 
   const handleSaveAll = () => {
@@ -1666,6 +2028,7 @@ function SkillsTab() {
     try {
       saveLocalCustomSkills(customSkills);
       toast.success("Skills saved successfully!");
+      onSaved?.();
     } catch {
       toast.error("Failed to save skills");
     } finally {
@@ -1870,10 +2233,100 @@ function SkillsTab() {
 }
 
 // ─────────────────────────────────────────
-// Live Preview Panel
+// Inline Preview Pane (desktop sidebar)
 // ─────────────────────────────────────────
-function LivePreviewPanel({ onClose }: { onClose: () => void }) {
-  const previewUrl = `${window.location.origin}/?preview=1`;
+interface InlinePreviewPaneProps {
+  version: number;
+  onClose: () => void;
+}
+
+function InlinePreviewPane({ version, onClose }: InlinePreviewPaneProps) {
+  const previewUrl = `${window.location.origin}/`;
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  const handleRefresh = () => {
+    if (iframeRef.current) {
+      iframeRef.current.src = "";
+      iframeRef.current.src = previewUrl;
+    }
+  };
+
+  return (
+    <div
+      className="flex flex-col h-full border-l border-border/30"
+      style={{ background: "oklch(0.06 0.01 15)" }}
+    >
+      {/* Pane header */}
+      <div
+        className="flex items-center justify-between px-4 py-3 border-b border-border/30 flex-shrink-0"
+        style={{ background: "oklch(0.08 0.015 15)" }}
+      >
+        <div className="flex items-center gap-2">
+          <Monitor className="w-4 h-4 text-primary" />
+          <span className="font-display font-semibold text-sm gradient-text">
+            Live Preview
+          </span>
+        </div>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={handleRefresh}
+            className="p-1.5 rounded-lg hover:bg-white/5 text-muted-foreground hover:text-primary transition-colors"
+            title="Refresh preview"
+            data-ocid="preview.button"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 rounded-lg hover:bg-white/5 text-muted-foreground hover:text-foreground transition-colors"
+            data-ocid="preview.close_button"
+            aria-label="Close preview"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* iframe */}
+      <div className="flex-1 overflow-hidden">
+        <iframe
+          ref={iframeRef}
+          key={version}
+          src={previewUrl}
+          title="Portfolio Preview"
+          className="w-full h-full border-0"
+          style={{ background: "#000" }}
+        />
+      </div>
+
+      {/* Bottom bar */}
+      <div
+        className="flex items-center justify-between px-4 py-2 border-t border-border/30 flex-shrink-0"
+        style={{ background: "oklch(0.08 0.015 15)" }}
+      >
+        <span className="text-xs text-muted-foreground truncate max-w-[220px]">
+          {previewUrl}
+        </span>
+        <a
+          href={previewUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs text-primary hover:underline flex items-center gap-1 flex-shrink-0"
+        >
+          Open ↗
+        </a>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────
+// Fullscreen Preview Panel (mobile)
+// ─────────────────────────────────────────
+function MobilePreviewPanel({ onClose }: { onClose: () => void }) {
+  const previewUrl = `${window.location.origin}/`;
 
   return (
     <AnimatePresence>
@@ -1904,9 +2357,6 @@ function LivePreviewPanel({ onClose }: { onClose: () => void }) {
               <span className="font-display font-semibold text-sm gradient-text">
                 Live Preview
               </span>
-              <span className="text-xs text-muted-foreground">
-                — Save changes first to see updates
-              </span>
             </div>
             <button
               type="button"
@@ -1928,32 +2378,6 @@ function LivePreviewPanel({ onClose }: { onClose: () => void }) {
               style={{ background: "#000" }}
             />
           </div>
-
-          {/* Refresh bar */}
-          <div
-            className="flex items-center justify-between px-4 py-2 border-t border-border/30 flex-shrink-0"
-            style={{ background: "oklch(0.08 0.015 15)" }}
-          >
-            <span className="text-xs text-muted-foreground">{previewUrl}</span>
-            <button
-              type="button"
-              onClick={() => {
-                const iframe = document.querySelector(
-                  'iframe[title="Portfolio Preview"]',
-                ) as HTMLIFrameElement;
-                if (iframe) {
-                  // Force reload the iframe by reassigning its current src
-                  const currentSrc = iframe.src;
-                  iframe.src = "";
-                  iframe.src = currentSrc;
-                }
-              }}
-              className="text-xs text-primary hover:underline"
-              data-ocid="preview.button"
-            >
-              ↺ Refresh
-            </button>
-          </div>
         </motion.div>
       </motion.div>
     </AnimatePresence>
@@ -1965,6 +2389,11 @@ function LivePreviewPanel({ onClose }: { onClose: () => void }) {
 // ─────────────────────────────────────────
 function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewVersion, setPreviewVersion] = useState(0);
+
+  const handleSaved = useCallback(() => {
+    setPreviewVersion((v) => v + 1);
+  }, []);
 
   return (
     <div className="min-h-screen bg-background">
@@ -2001,12 +2430,16 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setPreviewOpen(true)}
-              className="hidden sm:flex items-center gap-1.5 border-primary/30 text-primary hover:bg-primary/10 hover:shadow-glow transition-all"
+              onClick={() => setPreviewOpen(!previewOpen)}
+              className={`items-center gap-1.5 border-primary/30 text-primary hover:bg-primary/10 hover:shadow-glow transition-all ${
+                previewOpen ? "bg-primary/15 shadow-glow" : ""
+              }`}
               data-ocid="admin.preview.open_modal_button"
             >
               <Monitor className="w-4 h-4" />
-              Preview
+              <span className="hidden sm:inline">
+                {previewOpen ? "Hide Preview" : "Preview"}
+              </span>
             </Button>
 
             <Button
@@ -2023,85 +2456,120 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         </div>
       </header>
 
-      <main className="container mx-auto px-6 py-8">
-        <Tabs defaultValue="projects" className="space-y-6">
-          <div className="overflow-x-auto pb-1">
-            <TabsList className="glass border border-border/30 p-1 h-auto gap-1 w-max">
-              <TabsTrigger
+      {/* Body: split layout on lg+ when preview open */}
+      <div className={`flex ${previewOpen ? "lg:h-[calc(100vh-64px)]" : ""}`}>
+        {/* Main content */}
+        <main
+          className={`flex-1 min-w-0 overflow-y-auto ${previewOpen ? "lg:h-[calc(100vh-64px)]" : ""}`}
+        >
+          <div className="container mx-auto px-6 py-8">
+            <Tabs defaultValue="projects" className="space-y-6">
+              <div className="overflow-x-auto pb-1">
+                <TabsList className="glass border border-border/30 p-1 h-auto gap-1 w-max">
+                  <TabsTrigger
+                    value="projects"
+                    className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary rounded-md px-4 py-2.5 text-sm font-medium gap-2 whitespace-nowrap"
+                    data-ocid="admin.projects.tab"
+                  >
+                    <LayoutDashboard className="w-4 h-4" />
+                    Projects
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="reviews"
+                    className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary rounded-md px-4 py-2.5 text-sm font-medium gap-2 whitespace-nowrap"
+                    data-ocid="admin.reviews.tab"
+                  >
+                    <Star className="w-4 h-4" />
+                    Reviews
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="contact"
+                    className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary rounded-md px-4 py-2.5 text-sm font-medium gap-2 whitespace-nowrap"
+                    data-ocid="admin.contact.tab"
+                  >
+                    <User className="w-4 h-4" />
+                    Contact Info
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="hero"
+                    className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary rounded-md px-4 py-2.5 text-sm font-medium gap-2 whitespace-nowrap"
+                    data-ocid="admin.hero.tab"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    Hero
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="design"
+                    className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary rounded-md px-4 py-2.5 text-sm font-medium gap-2 whitespace-nowrap"
+                    data-ocid="admin.design.tab"
+                  >
+                    <Palette className="w-4 h-4" />
+                    Design
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="skills"
+                    className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary rounded-md px-4 py-2.5 text-sm font-medium gap-2 whitespace-nowrap"
+                    data-ocid="admin.skills.tab"
+                  >
+                    <Code2 className="w-4 h-4" />
+                    Skills
+                  </TabsTrigger>
+                </TabsList>
+              </div>
+
+              <TabsContent
                 value="projects"
-                className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary rounded-md px-4 py-2.5 text-sm font-medium gap-2 whitespace-nowrap"
-                data-ocid="admin.projects.tab"
+                className="focus-visible:outline-none"
               >
-                <LayoutDashboard className="w-4 h-4" />
-                Projects
-              </TabsTrigger>
-              <TabsTrigger
+                <ProjectsTab onSaved={handleSaved} />
+              </TabsContent>
+              <TabsContent
                 value="reviews"
-                className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary rounded-md px-4 py-2.5 text-sm font-medium gap-2 whitespace-nowrap"
-                data-ocid="admin.reviews.tab"
+                className="focus-visible:outline-none"
               >
-                <Star className="w-4 h-4" />
-                Reviews
-              </TabsTrigger>
-              <TabsTrigger
+                <ReviewsTab onSaved={handleSaved} />
+              </TabsContent>
+              <TabsContent
                 value="contact"
-                className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary rounded-md px-4 py-2.5 text-sm font-medium gap-2 whitespace-nowrap"
-                data-ocid="admin.contact.tab"
+                className="focus-visible:outline-none"
               >
-                <User className="w-4 h-4" />
-                Contact Info
-              </TabsTrigger>
-              <TabsTrigger
-                value="hero"
-                className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary rounded-md px-4 py-2.5 text-sm font-medium gap-2 whitespace-nowrap"
-                data-ocid="admin.hero.tab"
-              >
-                <Sparkles className="w-4 h-4" />
-                Hero
-              </TabsTrigger>
-              <TabsTrigger
+                <ContactTab onSaved={handleSaved} />
+              </TabsContent>
+              <TabsContent value="hero" className="focus-visible:outline-none">
+                <HeroTab onSaved={handleSaved} />
+              </TabsContent>
+              <TabsContent
                 value="design"
-                className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary rounded-md px-4 py-2.5 text-sm font-medium gap-2 whitespace-nowrap"
-                data-ocid="admin.design.tab"
+                className="focus-visible:outline-none"
               >
-                <Palette className="w-4 h-4" />
-                Design
-              </TabsTrigger>
-              <TabsTrigger
+                <DesignTab onSaved={handleSaved} />
+              </TabsContent>
+              <TabsContent
                 value="skills"
-                className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary rounded-md px-4 py-2.5 text-sm font-medium gap-2 whitespace-nowrap"
-                data-ocid="admin.skills.tab"
+                className="focus-visible:outline-none"
               >
-                <Code2 className="w-4 h-4" />
-                Skills
-              </TabsTrigger>
-            </TabsList>
+                <SkillsTab onSaved={handleSaved} />
+              </TabsContent>
+            </Tabs>
           </div>
+        </main>
 
-          <TabsContent value="projects" className="focus-visible:outline-none">
-            <ProjectsTab />
-          </TabsContent>
-          <TabsContent value="reviews" className="focus-visible:outline-none">
-            <ReviewsTab />
-          </TabsContent>
-          <TabsContent value="contact" className="focus-visible:outline-none">
-            <ContactTab />
-          </TabsContent>
-          <TabsContent value="hero" className="focus-visible:outline-none">
-            <HeroTab />
-          </TabsContent>
-          <TabsContent value="design" className="focus-visible:outline-none">
-            <DesignTab />
-          </TabsContent>
-          <TabsContent value="skills" className="focus-visible:outline-none">
-            <SkillsTab />
-          </TabsContent>
-        </Tabs>
-      </main>
+        {/* Inline preview pane (desktop only when open) */}
+        {previewOpen && (
+          <aside className="hidden lg:flex flex-col w-[420px] flex-shrink-0 sticky top-16 h-[calc(100vh-64px)]">
+            <InlinePreviewPane
+              version={previewVersion}
+              onClose={() => setPreviewOpen(false)}
+            />
+          </aside>
+        )}
+      </div>
 
-      {/* Live Preview Panel */}
+      {/* Mobile fullscreen preview (only on small screens) */}
       {previewOpen && (
-        <LivePreviewPanel onClose={() => setPreviewOpen(false)} />
+        <div className="lg:hidden">
+          <MobilePreviewPanel onClose={() => setPreviewOpen(false)} />
+        </div>
       )}
     </div>
   );

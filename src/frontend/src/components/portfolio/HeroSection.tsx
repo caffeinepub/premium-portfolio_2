@@ -153,7 +153,7 @@ export default function HeroSection({
   };
 
   const heroSettings = getLocalHeroSettings();
-  const name = contactName || "Alex Rivera";
+  const name = contactName || "Ganesh Raikwar";
   const title = contactTitle || "Full-Stack Developer & Creative Technologist";
 
   return (

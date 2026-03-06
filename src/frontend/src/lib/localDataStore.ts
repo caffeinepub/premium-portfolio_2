@@ -328,3 +328,79 @@ export function getLocalCustomSkills(): CustomSkill[] {
 export function saveLocalCustomSkills(skills: CustomSkill[]): void {
   localStorage.setItem(SKILLS_KEY, JSON.stringify(skills));
 }
+
+// ─── Social Settings ──────────────────────────────────────────
+
+export interface SocialSettings {
+  instagram?: string;
+  youtube?: string;
+  behance?: string;
+  dribbble?: string;
+  discord?: string;
+  whatsapp?: string;
+}
+
+const SOCIAL_KEY = "portfolio_social";
+
+export const DEFAULT_SOCIAL_SETTINGS: SocialSettings = {
+  instagram: "",
+  youtube: "",
+  behance: "",
+  dribbble: "",
+  discord: "",
+  whatsapp: "",
+};
+
+export function getSocialSettings(): SocialSettings {
+  try {
+    const raw = localStorage.getItem(SOCIAL_KEY);
+    if (!raw) return { ...DEFAULT_SOCIAL_SETTINGS };
+    return { ...DEFAULT_SOCIAL_SETTINGS, ...JSON.parse(raw) };
+  } catch {
+    return { ...DEFAULT_SOCIAL_SETTINGS };
+  }
+}
+
+export function saveSocialSettings(settings: SocialSettings): void {
+  localStorage.setItem(SOCIAL_KEY, JSON.stringify(settings));
+}
+
+// ─── Project Extras ───────────────────────────────────────────
+
+export interface ProjectExtras {
+  id: string; // matches project id as string
+  techTags: string[];
+  status: "completed" | "in-progress" | "concept";
+  year: string;
+}
+
+const PROJECT_EXTRAS_KEY = "portfolio_project_extras";
+
+export function getProjectExtras(): ProjectExtras[] {
+  try {
+    const raw = localStorage.getItem(PROJECT_EXTRAS_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as ProjectExtras[];
+  } catch {
+    return [];
+  }
+}
+
+export function saveProjectExtras(extras: ProjectExtras[]): void {
+  localStorage.setItem(PROJECT_EXTRAS_KEY, JSON.stringify(extras));
+}
+
+export function getProjectExtra(id: string): ProjectExtras | undefined {
+  return getProjectExtras().find((e) => e.id === id);
+}
+
+export function upsertProjectExtra(extra: ProjectExtras): void {
+  const all = getProjectExtras();
+  const idx = all.findIndex((e) => e.id === extra.id);
+  if (idx >= 0) {
+    all[idx] = extra;
+  } else {
+    all.push(extra);
+  }
+  saveProjectExtras(all);
+}

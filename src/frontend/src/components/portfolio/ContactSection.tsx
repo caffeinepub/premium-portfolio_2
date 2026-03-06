@@ -1,7 +1,24 @@
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { ArrowUpRight, Mail, User } from "lucide-react";
 import { motion } from "motion/react";
-import { SiGithub, SiLinkedin, SiX } from "react-icons/si";
+import {
+  SiBehance,
+  SiDiscord,
+  SiDribbble,
+  SiGithub,
+  SiInstagram,
+  SiLinkedin,
+  SiWhatsapp,
+  SiX,
+  SiYoutube,
+} from "react-icons/si";
 import type { ContactInfo } from "../../backend";
+import type { SocialSettings } from "../../lib/localDataStore";
 
 interface SocialLink {
   label: string;
@@ -17,39 +34,92 @@ interface SocialLink {
 
 interface ContactSectionProps {
   contact: ContactInfo | null;
+  social?: SocialSettings;
 }
 
-export default function ContactSection({ contact }: ContactSectionProps) {
+export default function ContactSection({
+  contact,
+  social,
+}: ContactSectionProps) {
   if (!contact) return null;
+
+  // All icons use red theme to match email icon
+  const redGlow = "oklch(0.65 0.26 20 / 0.5)";
+  const redHover = "oklch(0.78 0.24 22)";
 
   const socialLinks: SocialLink[] = [
     contact.email && {
       label: "Email",
       icon: Mail,
       href: `mailto:${contact.email}`,
-      glowColor: "oklch(0.65 0.26 20 / 0.4)",
-      hoverColor: "oklch(0.78 0.24 22)",
+      glowColor: redGlow,
+      hoverColor: redHover,
     },
     contact.github && {
       label: "GitHub",
       icon: SiGithub,
       href: `https://github.com/${contact.github}`,
-      glowColor: "oklch(0.85 0 0 / 0.3)",
-      hoverColor: "oklch(0.9 0 0)",
+      glowColor: redGlow,
+      hoverColor: redHover,
     },
     contact.linkedin && {
       label: "LinkedIn",
       icon: SiLinkedin,
       href: `https://linkedin.com/in/${contact.linkedin}`,
-      glowColor: "oklch(0.65 0.18 230 / 0.4)",
-      hoverColor: "oklch(0.65 0.18 230)",
+      glowColor: redGlow,
+      hoverColor: redHover,
     },
     contact.twitter && {
       label: "X / Twitter",
       icon: SiX,
       href: `https://twitter.com/${contact.twitter}`,
-      glowColor: "oklch(0.85 0 0 / 0.3)",
-      hoverColor: "oklch(0.9 0 0)",
+      glowColor: redGlow,
+      hoverColor: redHover,
+    },
+    // New social platforms from SocialSettings
+    social?.instagram && {
+      label: "Instagram",
+      icon: SiInstagram,
+      href: `https://instagram.com/${social.instagram.replace(/^@/, "")}`,
+      glowColor: redGlow,
+      hoverColor: redHover,
+    },
+    social?.youtube && {
+      label: "YouTube",
+      icon: SiYoutube,
+      href: social.youtube.startsWith("http")
+        ? social.youtube
+        : `https://youtube.com/@${social.youtube}`,
+      glowColor: redGlow,
+      hoverColor: redHover,
+    },
+    social?.behance && {
+      label: "Behance",
+      icon: SiBehance,
+      href: `https://behance.net/${social.behance}`,
+      glowColor: redGlow,
+      hoverColor: redHover,
+    },
+    social?.dribbble && {
+      label: "Dribbble",
+      icon: SiDribbble,
+      href: `https://dribbble.com/${social.dribbble}`,
+      glowColor: redGlow,
+      hoverColor: redHover,
+    },
+    social?.discord && {
+      label: "Discord",
+      icon: SiDiscord,
+      href: "https://discord.com",
+      glowColor: redGlow,
+      hoverColor: redHover,
+    },
+    social?.whatsapp && {
+      label: "WhatsApp",
+      icon: SiWhatsapp,
+      href: `https://wa.me/${social.whatsapp.replace(/[^0-9]/g, "")}`,
+      glowColor: redGlow,
+      hoverColor: redHover,
     },
   ].filter(Boolean) as SocialLink[];
 
@@ -183,57 +253,89 @@ export default function ContactSection({ contact }: ContactSectionProps) {
             </div>
           </motion.div>
 
-          {/* Social links grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            {socialLinks.map((link, i) => (
-              <motion.a
-                key={link.label}
-                href={link.href}
-                target={link.href.startsWith("mailto") ? undefined : "_blank"}
-                rel={
-                  link.href.startsWith("mailto")
-                    ? undefined
-                    : "noopener noreferrer"
-                }
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: i * 0.1 }}
-                whileHover={{ scale: 1.05, y: -3 }}
-                className="group flex flex-col items-center gap-3 p-5 rounded-2xl glass transition-all duration-200 relative overflow-hidden"
-              >
+          {/* Social links — icons only with tooltips, circle border, red glow animated */}
+          <TooltipProvider delayDuration={200}>
+            <div className="flex flex-wrap justify-center gap-4">
+              {socialLinks.map((link, i) => (
                 <motion.div
-                  className="w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-300 group-hover:scale-110"
-                  style={{
-                    background: link.glowColor
-                      .replace("/ 0.4)", "/ 0.15)")
-                      .replace("/ 0.3)", "/ 0.15)"),
-                  }}
-                  whileHover={{
-                    boxShadow: `0 0 12px ${link.glowColor}, 0 0 24px ${link.glowColor.replace("/ 0.4)", "/ 0.2)").replace("/ 0.3)", "/ 0.15)")}`,
-                  }}
+                  key={link.label}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.5, delay: i * 0.07 }}
                 >
-                  <link.icon
-                    size={22}
-                    className="transition-colors duration-200"
-                    color={link.hoverColor}
-                  />
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <motion.a
+                        href={link.href}
+                        target={
+                          link.href.startsWith("mailto") ? undefined : "_blank"
+                        }
+                        rel={
+                          link.href.startsWith("mailto")
+                            ? undefined
+                            : "noopener noreferrer"
+                        }
+                        whileHover={{ scale: 1.15, y: -4 }}
+                        whileTap={{ scale: 0.95 }}
+                        animate={{
+                          boxShadow: [
+                            "0 0 6px oklch(0.65 0.26 20 / 0.35), inset 0 0 6px oklch(0.65 0.26 20 / 0.08)",
+                            "0 0 14px oklch(0.65 0.26 20 / 0.65), inset 0 0 10px oklch(0.65 0.26 20 / 0.15)",
+                            "0 0 6px oklch(0.65 0.26 20 / 0.35), inset 0 0 6px oklch(0.65 0.26 20 / 0.08)",
+                          ],
+                        }}
+                        transition={{
+                          boxShadow: {
+                            duration: 2.5,
+                            repeat: Number.POSITIVE_INFINITY,
+                            delay: i * 0.18,
+                          },
+                        }}
+                        className="group relative flex items-center justify-center rounded-full transition-all duration-300"
+                        style={{
+                          width: "46px",
+                          height: "46px",
+                          background: "oklch(0.65 0.26 20 / 0.08)",
+                          border: "1.5px solid oklch(0.65 0.26 20 / 0.45)",
+                        }}
+                        onMouseEnter={(e) => {
+                          const el = e.currentTarget as HTMLElement;
+                          el.style.background = "oklch(0.65 0.26 20 / 0.2)";
+                          el.style.borderColor = "oklch(0.65 0.26 20 / 0.8)";
+                          el.style.boxShadow =
+                            "0 0 20px oklch(0.65 0.26 20 / 0.7), 0 0 40px oklch(0.65 0.26 20 / 0.3)";
+                        }}
+                        onMouseLeave={(e) => {
+                          const el = e.currentTarget as HTMLElement;
+                          el.style.background = "oklch(0.65 0.26 20 / 0.08)";
+                          el.style.borderColor = "oklch(0.65 0.26 20 / 0.45)";
+                          el.style.boxShadow = "";
+                        }}
+                      >
+                        <link.icon
+                          size={18}
+                          className="transition-colors duration-200"
+                          color="oklch(0.78 0.24 22)"
+                        />
+                      </motion.a>
+                    </TooltipTrigger>
+                    <TooltipContent
+                      side="top"
+                      className="text-xs font-medium"
+                      style={{
+                        background: "oklch(0.1 0.01 15)",
+                        border: "1px solid oklch(0.65 0.26 20 / 0.3)",
+                        color: "oklch(0.85 0 0)",
+                      }}
+                    >
+                      {link.label}
+                    </TooltipContent>
+                  </Tooltip>
                 </motion.div>
-                <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">
-                  {link.label}
-                </span>
-                <ArrowUpRight className="absolute top-3 right-3 w-3.5 h-3.5 text-muted-foreground/40 opacity-0 group-hover:opacity-100 transition-opacity" />
-
-                {/* Red neon glow on hover */}
-                <div
-                  className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
-                  style={{
-                    boxShadow: `inset 0 0 0 1px ${link.glowColor}`,
-                  }}
-                />
-              </motion.a>
-            ))}
-          </div>
+              ))}
+            </div>
+          </TooltipProvider>
         </div>
       </div>
     </section>

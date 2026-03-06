@@ -119,11 +119,11 @@ export const sampleReviews: Review[] = [
 ];
 
 export const sampleContactInfo: ContactInfo = {
-  name: "Alex Rivera",
+  name: "Ganesh Raikwar",
   title: "Full-Stack Developer & Creative Technologist",
   bio: "I craft digital experiences at the intersection of engineering and design. With 7+ years building products that millions use, I bring both technical depth and visual sensibility to every project.",
-  email: "alex@portfolio.dev",
-  github: "alexrivera",
-  linkedin: "alexrivera",
-  twitter: "alexrivera",
+  email: "ganesh@portfolio.dev",
+  github: "ganeshraikwar",
+  linkedin: "ganeshraikwar",
+  twitter: "ganeshraikwar",
 };
