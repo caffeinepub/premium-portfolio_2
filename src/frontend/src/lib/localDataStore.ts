@@ -211,3 +211,120 @@ export function saveLocalContact(contact: ContactInfo): void {
 export function clearLocalContact(): void {
   localStorage.removeItem(CONTACT_KEY);
 }
+
+// ─── Design Settings ──────────────────────────────────────────
+
+export interface DesignSettings {
+  primaryColorHue: number; // 0-360, default 20 (red)
+  glowIntensity: "low" | "medium" | "high"; // default 'medium'
+  fontHeading: string; // CSS font-family, default 'Inter'
+  fontBody: string; // CSS font-family, default 'Inter'
+  animationsEnabled: boolean; // default true
+  sections: {
+    work: boolean;
+    projects: boolean;
+    skills: boolean;
+    reviews: boolean;
+    contact: boolean;
+  };
+  bgStyle: "pure-black" | "dark-gray" | "deep-red"; // default 'pure-black'
+}
+
+const DESIGN_KEY = "portfolio_design";
+
+export const DEFAULT_DESIGN_SETTINGS: DesignSettings = {
+  primaryColorHue: 20,
+  glowIntensity: "medium",
+  fontHeading: "Inter",
+  fontBody: "Inter",
+  animationsEnabled: true,
+  sections: {
+    work: true,
+    projects: true,
+    skills: true,
+    reviews: true,
+    contact: true,
+  },
+  bgStyle: "pure-black",
+};
+
+export function getLocalDesignSettings(): DesignSettings {
+  try {
+    const raw = localStorage.getItem(DESIGN_KEY);
+    if (!raw) return { ...DEFAULT_DESIGN_SETTINGS };
+    return { ...DEFAULT_DESIGN_SETTINGS, ...JSON.parse(raw) };
+  } catch {
+    return { ...DEFAULT_DESIGN_SETTINGS };
+  }
+}
+
+export function saveLocalDesignSettings(settings: DesignSettings): void {
+  localStorage.setItem(DESIGN_KEY, JSON.stringify(settings));
+}
+
+// ─── Hero Settings ────────────────────────────────────────────
+
+export interface HeroSettings {
+  tagline: string;
+  subtitle: string;
+  availabilityText: string;
+  ctaPrimary: string;
+  ctaSecondary: string;
+  stats: Array<{ value: string; label: string }>;
+}
+
+const HERO_KEY = "portfolio_hero";
+
+export const DEFAULT_HERO_SETTINGS: HeroSettings = {
+  tagline: "Hello, I'm",
+  subtitle:
+    "Crafting beautiful digital experiences with code, design, and AI — from concept to deployment.",
+  availabilityText: "Available for new projects",
+  ctaPrimary: "View My Work",
+  ctaSecondary: "Contact Me",
+  stats: [
+    { value: "7+", label: "Years Experience" },
+    { value: "50+", label: "Projects Shipped" },
+    { value: "30+", label: "Happy Clients" },
+    { value: "3", label: "Film Awards" },
+  ],
+};
+
+export function getLocalHeroSettings(): HeroSettings {
+  try {
+    const raw = localStorage.getItem(HERO_KEY);
+    if (!raw) return { ...DEFAULT_HERO_SETTINGS };
+    return { ...DEFAULT_HERO_SETTINGS, ...JSON.parse(raw) };
+  } catch {
+    return { ...DEFAULT_HERO_SETTINGS };
+  }
+}
+
+export function saveLocalHeroSettings(settings: HeroSettings): void {
+  localStorage.setItem(HERO_KEY, JSON.stringify(settings));
+}
+
+// ─── Custom Skills ─────────────────────────────────────────────
+
+export interface CustomSkill {
+  id: string;
+  name: string;
+  category: string;
+  level: number; // 1-5
+}
+
+const SKILLS_KEY = "portfolio_skills";
+
+export function getLocalCustomSkills(): CustomSkill[] {
+  try {
+    const raw = localStorage.getItem(SKILLS_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as CustomSkill[];
+  } catch {
+    return [];
+  }
+}
+
+export function saveLocalCustomSkills(skills: CustomSkill[]): void {
+  localStorage.setItem(SKILLS_KEY, JSON.stringify(skills));
+}

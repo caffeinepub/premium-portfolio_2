@@ -99,21 +99,8 @@ export default function NavBar() {
             ))}
           </div>
 
-          {/* Admin + mobile */}
+          {/* Mobile menu button area */}
           <div className="flex items-center gap-3">
-            <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
-              <Link
-                to="/admin"
-                data-ocid="nav.admin_link"
-                className="hidden sm:inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium glass transition-all duration-200 hover:text-primary"
-                style={{
-                  border: "1px solid oklch(0.65 0.26 20 / 0.3)",
-                }}
-              >
-                Admin
-              </Link>
-            </motion.div>
-
             {/* Mobile menu button */}
             <motion.button
               type="button"
@@ -157,14 +144,6 @@ export default function NavBar() {
                   {link.label}
                 </motion.button>
               ))}
-              <Link
-                to="/admin"
-                className="px-4 py-3 rounded-lg text-sm font-medium text-primary hover:bg-primary/10 transition-all"
-                style={{ color: "oklch(0.75 0.24 22)" }}
-                onClick={() => setMobileOpen(false)}
-              >
-                Admin Panel
-              </Link>
             </div>
           </motion.div>
         )}

@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { ChevronDown, Sparkles } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useRef } from "react";
+import { getLocalHeroSettings } from "../../lib/localDataStore";
 
 interface Particle {
   x: number;
@@ -151,6 +152,7 @@ export default function HeroSection({
     if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
+  const heroSettings = getLocalHeroSettings();
   const name = contactName || "Alex Rivera";
   const title = contactTitle || "Full-Stack Developer & Creative Technologist";
 
@@ -251,7 +253,7 @@ export default function HeroSection({
             transition={{ duration: 3, repeat: Number.POSITIVE_INFINITY }}
           >
             <Sparkles className="w-4 h-4 text-primary" />
-            <span>Available for new projects</span>
+            <span>{heroSettings.availabilityText}</span>
             <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
           </motion.div>
         </motion.div>
@@ -273,7 +275,7 @@ export default function HeroSection({
             }}
             transition={{ duration: 4, repeat: Number.POSITIVE_INFINITY }}
           >
-            Hello, I'm
+            {heroSettings.tagline}
           </motion.span>
           <br />
           <motion.span
@@ -306,8 +308,7 @@ export default function HeroSection({
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, ease: "easeOut", delay: 0.4 }}
         >
-          Crafting beautiful digital experiences with code, design, and AI —
-          from concept to deployment.
+          {heroSettings.subtitle}
         </motion.p>
 
         <motion.div
@@ -327,7 +328,7 @@ export default function HeroSection({
               onClick={() => scrollToSection("projects")}
               data-ocid="hero.primary_button"
             >
-              <span className="relative z-10">View My Work</span>
+              <span className="relative z-10">{heroSettings.ctaPrimary}</span>
             </Button>
           </motion.div>
           <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.98 }}>
@@ -339,7 +340,7 @@ export default function HeroSection({
               onClick={() => scrollToSection("contact")}
               data-ocid="hero.secondary_button"
             >
-              Contact Me
+              {heroSettings.ctaSecondary}
             </Button>
           </motion.div>
         </motion.div>
@@ -352,12 +353,7 @@ export default function HeroSection({
           animate={{ opacity: 1 }}
           transition={{ duration: 1, delay: 0.8 }}
         >
-          {[
-            { value: "7+", label: "Years Experience" },
-            { value: "50+", label: "Projects Shipped" },
-            { value: "30+", label: "Happy Clients" },
-            { value: "3", label: "Film Awards" },
-          ].map((stat, i) => (
+          {heroSettings.stats.map((stat, i) => (
             <motion.div
               key={stat.label}
               className="text-center"

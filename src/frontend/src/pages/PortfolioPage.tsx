@@ -15,6 +15,7 @@ import {
 import { getBackend } from "../lib/backendClient";
 import {
   getLocalContact,
+  getLocalDesignSettings,
   getLocalProjects,
   getLocalReviews,
 } from "../lib/localDataStore";
@@ -25,6 +26,24 @@ export default function PortfolioPage() {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [contact, setContact] = useState<ContactInfo | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Apply design settings (font, animation) to document root
+  useEffect(() => {
+    const settings = getLocalDesignSettings();
+    document.documentElement.style.setProperty(
+      "--font-heading",
+      `${settings.fontHeading}, sans-serif`,
+    );
+    document.documentElement.style.setProperty(
+      "--font-body",
+      `${settings.fontBody}, sans-serif`,
+    );
+    if (!settings.animationsEnabled) {
+      document.documentElement.style.setProperty("--animation-duration", "0s");
+    } else {
+      document.documentElement.style.removeProperty("--animation-duration");
+    }
+  }, []);
 
   useEffect(() => {
     const loadData = async () => {
@@ -92,6 +111,7 @@ export default function PortfolioPage() {
   const currentYear = new Date().getFullYear();
   const hostname =
     typeof window !== "undefined" ? window.location.hostname : "";
+  const designSettings = getLocalDesignSettings();
 
   return (
     <div className="min-h-screen bg-background">
@@ -105,11 +125,19 @@ export default function PortfolioPage() {
 
         {!loading && (
           <>
-            <FeaturedCarousel projects={featuredProjects} />
-            <ProjectsSection projects={projects} />
-            <SkillsSection />
-            <ReviewsSection reviews={reviews} />
-            <ContactSection contact={contact} />
+            {designSettings.sections.work && (
+              <FeaturedCarousel projects={featuredProjects} />
+            )}
+            {designSettings.sections.projects && (
+              <ProjectsSection projects={projects} />
+            )}
+            {designSettings.sections.skills && <SkillsSection />}
+            {designSettings.sections.reviews && (
+              <ReviewsSection reviews={reviews} />
+            )}
+            {designSettings.sections.contact && (
+              <ContactSection contact={contact} />
+            )}
           </>
         )}
 
