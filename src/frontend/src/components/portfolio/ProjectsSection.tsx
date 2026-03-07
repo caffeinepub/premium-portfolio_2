@@ -12,29 +12,30 @@ import { getProjectExtra } from "../../lib/localDataStore";
 
 const CATEGORIES = ["All", "Web Dev", "Design", "AI", "Editing"] as const;
 
+// All category colors now use CSS variables, so they auto-update with theme
 const CATEGORY_COLORS: Record<
   string,
   { bg: string; text: string; border: string }
 > = {
   "Web Dev": {
-    bg: "oklch(0.65 0.26 20 / 0.15)",
-    text: "oklch(0.78 0.24 22)",
-    border: "oklch(0.65 0.26 20 / 0.35)",
+    bg: "var(--theme-primary-dim)",
+    text: "var(--theme-text-primary)",
+    border: "var(--theme-primary-border)",
   },
   Design: {
-    bg: "oklch(0.55 0.28 15 / 0.15)",
-    text: "oklch(0.72 0.26 18)",
-    border: "oklch(0.55 0.28 15 / 0.35)",
+    bg: "var(--theme-accent-dim)",
+    text: "var(--theme-text-secondary)",
+    border: "var(--theme-accent-border)",
   },
   AI: {
-    bg: "oklch(0.60 0.25 25 / 0.15)",
-    text: "oklch(0.75 0.22 28)",
-    border: "oklch(0.60 0.25 25 / 0.35)",
+    bg: "var(--theme-primary-dim)",
+    text: "var(--theme-text-primary)",
+    border: "var(--theme-border-line)",
   },
   Editing: {
-    bg: "oklch(0.70 0.22 30 / 0.15)",
-    text: "oklch(0.80 0.20 32)",
-    border: "oklch(0.70 0.22 30 / 0.35)",
+    bg: "var(--theme-primary-mid)",
+    text: "var(--theme-text-secondary)",
+    border: "var(--theme-primary-border)",
   },
 };
 
@@ -126,7 +127,7 @@ function ProjectCard({ project, index }: { project: Project; index: number }) {
         style={{
           transform: `rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`,
           boxShadow: hovered
-            ? "0 12px 40px oklch(0 0 0 / 0.5), 0 0 20px oklch(0.65 0.26 20 / 0.15)"
+            ? "0 12px 40px oklch(0 0 0 / 0.5), 0 0 20px var(--theme-primary-glow2)"
             : "0 8px 32px oklch(0 0 0 / 0.4)",
         }}
       >
@@ -214,7 +215,7 @@ function ProjectCard({ project, index }: { project: Project; index: number }) {
                     height: "4px",
                     background:
                       i === imgIndex
-                        ? "oklch(0.65 0.26 20)"
+                        ? "var(--theme-primary)"
                         : "oklch(1 0 0 / 0.5)",
                   }}
                   aria-label={`Image ${i + 1}`}
@@ -260,12 +261,12 @@ function ProjectCard({ project, index }: { project: Project; index: number }) {
           )}
         </div>
 
-        {/* Red neon hover border glow */}
+        {/* Theme hover border glow */}
         <div
           className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
           style={{
             boxShadow:
-              "inset 0 0 0 1px oklch(0.65 0.26 20 / 0.35), inset 0 0 20px oklch(0.65 0.26 20 / 0.04)",
+              "inset 0 0 0 1px var(--theme-primary-glow), inset 0 0 20px var(--theme-primary-low)",
           }}
         />
       </div>
@@ -299,20 +300,20 @@ export default function ProjectsSection({ projects }: ProjectsSectionProps) {
           <div className="flex items-center gap-3 mb-3">
             <motion.div
               className="h-px flex-1 max-w-12"
-              style={{ background: "oklch(0.55 0.28 15)" }}
+              style={{ background: "var(--theme-accent)" }}
               animate={{
                 opacity: [0.5, 1, 0.5],
                 boxShadow: [
-                  "0 0 4px oklch(0.55 0.28 15 / 0.4)",
-                  "0 0 8px oklch(0.55 0.28 15 / 0.8)",
-                  "0 0 4px oklch(0.55 0.28 15 / 0.4)",
+                  "0 0 4px var(--theme-accent-border)",
+                  "0 0 8px var(--theme-accent)",
+                  "0 0 4px var(--theme-accent-border)",
                 ],
               }}
               transition={{ duration: 2.5, repeat: Number.POSITIVE_INFINITY }}
             />
             <span
               className="text-sm font-semibold uppercase tracking-widest"
-              style={{ color: "oklch(0.70 0.26 18)" }}
+              style={{ color: "var(--theme-text-secondary)" }}
             >
               All Work
             </span>
@@ -336,9 +337,9 @@ export default function ProjectsSection({ projects }: ProjectsSectionProps) {
                 style={
                   activeCategory === cat
                     ? {
-                        borderColor: "oklch(0.65 0.26 20 / 0.5)",
+                        borderColor: "var(--theme-primary-glow)",
                         boxShadow:
-                          "0 0 12px oklch(0.65 0.26 20 / 0.3), 0 0 24px oklch(0.65 0.26 20 / 0.1)",
+                          "0 0 12px var(--theme-primary-border), 0 0 24px var(--theme-primary-dim)",
                       }
                     : { borderColor: "oklch(0.35 0.06 15 / 0.5)" }
                 }

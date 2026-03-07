@@ -65,7 +65,7 @@ function ReviewCard({ review, index }: { review: Review; index: number }) {
       >
         <Quote
           className="w-8 h-8"
-          style={{ color: "oklch(0.65 0.26 20)" }}
+          style={{ color: "var(--theme-primary)" }}
           fill="currentColor"
         />
       </motion.div>
@@ -83,15 +83,15 @@ function ReviewCard({ review, index }: { review: Review; index: number }) {
         <Avatar
           className="w-11 h-11"
           style={{
-            boxShadow: "0 0 0 2px oklch(0.65 0.26 20 / 0.2)",
+            boxShadow: "0 0 0 2px var(--theme-primary-border)",
           }}
         >
           <AvatarImage src={review.avatarUrl} alt={review.author} />
           <AvatarFallback
             className="font-bold text-sm"
             style={{
-              background: "oklch(0.65 0.26 20 / 0.2)",
-              color: "oklch(0.75 0.24 22)",
+              background: "var(--theme-primary-mid)",
+              color: "var(--theme-text-primary)",
             }}
           >
             {initials}
@@ -105,12 +105,12 @@ function ReviewCard({ review, index }: { review: Review; index: number }) {
         </div>
       </div>
 
-      {/* Red neon hover border */}
+      {/* Theme hover border */}
       <div
         className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
         style={{
           boxShadow:
-            "inset 0 0 0 1px oklch(0.65 0.26 20 / 0.3), 0 0 16px oklch(0.65 0.26 20 / 0.08)",
+            "inset 0 0 0 1px var(--theme-primary-border), 0 0 16px var(--theme-primary-low)",
         }}
       />
     </motion.div>
@@ -124,12 +124,12 @@ interface ReviewsSectionProps {
 export default function ReviewsSection({ reviews }: ReviewsSectionProps) {
   return (
     <section id="reviews" className="py-24 relative overflow-hidden">
-      {/* Background — red neon */}
+      {/* Background gradient */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
           background:
-            "radial-gradient(ellipse at 50% 0%, oklch(0.65 0.26 20 / 0.05) 0%, transparent 60%)",
+            "radial-gradient(ellipse at 50% 0%, var(--theme-primary-low) 0%, transparent 60%)",
         }}
       />
 
@@ -145,30 +145,30 @@ export default function ReviewsSection({ reviews }: ReviewsSectionProps) {
           <div className="flex items-center justify-center gap-3 mb-3">
             <motion.div
               className="h-px w-12"
-              style={{ background: "oklch(0.55 0.28 15)" }}
+              style={{ background: "var(--theme-accent)" }}
               animate={{
                 boxShadow: [
-                  "0 0 4px oklch(0.55 0.28 15 / 0.4)",
-                  "0 0 8px oklch(0.55 0.28 15 / 0.8)",
-                  "0 0 4px oklch(0.55 0.28 15 / 0.4)",
+                  "0 0 4px var(--theme-accent-border)",
+                  "0 0 8px var(--theme-accent)",
+                  "0 0 4px var(--theme-accent-border)",
                 ],
               }}
               transition={{ duration: 2.5, repeat: Number.POSITIVE_INFINITY }}
             />
             <span
               className="text-sm font-semibold uppercase tracking-widest"
-              style={{ color: "oklch(0.70 0.26 18)" }}
+              style={{ color: "var(--theme-text-secondary)" }}
             >
               Testimonials
             </span>
             <motion.div
               className="h-px w-12"
-              style={{ background: "oklch(0.55 0.28 15)" }}
+              style={{ background: "var(--theme-accent)" }}
               animate={{
                 boxShadow: [
-                  "0 0 4px oklch(0.55 0.28 15 / 0.4)",
-                  "0 0 8px oklch(0.55 0.28 15 / 0.8)",
-                  "0 0 4px oklch(0.55 0.28 15 / 0.4)",
+                  "0 0 4px var(--theme-accent-border)",
+                  "0 0 8px var(--theme-accent)",
+                  "0 0 4px var(--theme-accent-border)",
                 ],
               }}
               transition={{

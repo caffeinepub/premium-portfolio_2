@@ -47,9 +47,7 @@ export default function NavBar() {
           scrolled ? "glass-strong" : "bg-transparent"
         }`}
         style={
-          scrolled
-            ? { borderBottom: "1px solid oklch(0.65 0.26 20 / 0.15)" }
-            : {}
+          scrolled ? { borderBottom: "1px solid var(--theme-border-line)" } : {}
         }
         initial={{ y: -80, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
@@ -75,11 +73,11 @@ export default function NavBar() {
                 className="w-8 h-8 rounded-lg flex items-center justify-center font-display font-bold text-sm text-white"
                 style={{
                   background:
-                    "linear-gradient(135deg, oklch(0.75 0.24 22), oklch(0.55 0.28 10))",
+                    "linear-gradient(135deg, var(--theme-text-primary), var(--theme-accent))",
                 }}
                 whileHover={{
                   boxShadow:
-                    "0 0 16px oklch(0.65 0.26 20 / 0.6), 0 0 32px oklch(0.65 0.26 20 / 0.3)",
+                    "0 0 16px var(--theme-primary-glow), 0 0 32px var(--theme-primary-glow2)",
                   scale: 1.1,
                 }}
                 transition={{ duration: 0.2 }}
@@ -115,8 +113,8 @@ export default function NavBar() {
                 <motion.span
                   className="absolute bottom-0 left-1/2 -translate-x-1/2 h-0.5 rounded-full"
                   style={{
-                    background: "oklch(0.65 0.26 20)",
-                    boxShadow: "0 0 6px oklch(0.65 0.26 20 / 0.8)",
+                    background: "var(--theme-primary)",
+                    boxShadow: "0 0 6px var(--theme-primary)",
                   }}
                   initial={{ width: 0 }}
                   whileHover={{ width: "60%" }}
@@ -155,7 +153,7 @@ export default function NavBar() {
             exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.2 }}
             className="fixed top-16 left-0 right-0 z-40 glass-strong md:hidden"
-            style={{ borderBottom: "1px solid oklch(0.65 0.26 20 / 0.2)" }}
+            style={{ borderBottom: "1px solid var(--theme-border-line)" }}
           >
             <div className="container mx-auto px-6 py-4 flex flex-col gap-1">
               {navLinks.map((link, i) => (

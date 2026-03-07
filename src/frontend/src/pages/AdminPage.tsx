@@ -78,6 +78,7 @@ import {
   type SocialSettings,
   addLocalProject,
   addLocalReview,
+  applyDesignToDOM,
   deleteLocalProject,
   deleteLocalReview,
   getLocalContact,
@@ -2182,7 +2183,9 @@ function DesignTab({ onSaved }: DesignTabProps) {
     setSaving(true);
     try {
       saveLocalDesignSettings(form);
-      toast.success("Design settings saved!");
+      // Apply CSS variables immediately so changes are visible without page reload
+      applyDesignToDOM(form);
+      toast.success("Design settings saved! Changes applied live.");
       onSaved?.();
     } catch {
       toast.error("Failed to save design settings");

@@ -167,7 +167,7 @@
     box-shadow: inset 0 0 30px oklch(0.65 0.26 20 / 0.04), 0 0 20px oklch(0.65 0.26 20 / 0.08);
   }
 
-  /* Gradient text */
+  /* Gradient text -- base values; overridden by __theme-gradient-text injected by applyDesignToDOM */
   .gradient-text {
     background: linear-gradient(135deg, oklch(0.75 0.24 22), oklch(0.55 0.28 10));
     -webkit-background-clip: text;

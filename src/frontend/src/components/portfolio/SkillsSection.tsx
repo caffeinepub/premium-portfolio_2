@@ -183,12 +183,12 @@ export default function SkillsSection() {
 
   return (
     <section id="skills" className="py-24 relative overflow-hidden">
-      {/* Background — red neon gradient */}
+      {/* Background gradient */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
           background:
-            "radial-gradient(ellipse at 70% 50%, oklch(0.55 0.28 15 / 0.06) 0%, transparent 60%), radial-gradient(ellipse at 30% 50%, oklch(0.65 0.26 20 / 0.06) 0%, transparent 60%)",
+            "radial-gradient(ellipse at 70% 50%, var(--theme-accent-dim) 0%, transparent 60%), radial-gradient(ellipse at 30% 50%, var(--theme-primary-low) 0%, transparent 60%)",
         }}
       />
 
@@ -204,23 +204,23 @@ export default function SkillsSection() {
           <div className="flex items-center justify-center gap-3 mb-3">
             <motion.div
               className="h-px w-12"
-              style={{ background: "oklch(0.65 0.26 20)" }}
+              style={{ background: "var(--theme-primary)" }}
               animate={{
                 boxShadow: [
-                  "0 0 4px oklch(0.65 0.26 20 / 0.4)",
-                  "0 0 10px oklch(0.65 0.26 20 / 0.8)",
-                  "0 0 4px oklch(0.65 0.26 20 / 0.4)",
+                  "0 0 4px var(--theme-primary-glow)",
+                  "0 0 10px var(--theme-primary)",
+                  "0 0 4px var(--theme-primary-glow)",
                 ],
               }}
               transition={{ duration: 2, repeat: Number.POSITIVE_INFINITY }}
             />
             <motion.span
               className="text-sm font-semibold uppercase tracking-widest"
-              style={{ color: "oklch(0.75 0.24 22)" }}
+              style={{ color: "var(--theme-text-primary)" }}
               animate={{
                 textShadow: [
                   "0 0 0px transparent",
-                  "0 0 8px oklch(0.65 0.26 20 / 0.5)",
+                  "0 0 8px var(--theme-primary-glow)",
                   "0 0 0px transparent",
                 ],
               }}
@@ -230,12 +230,12 @@ export default function SkillsSection() {
             </motion.span>
             <motion.div
               className="h-px w-12"
-              style={{ background: "oklch(0.65 0.26 20)" }}
+              style={{ background: "var(--theme-primary)" }}
               animate={{
                 boxShadow: [
-                  "0 0 4px oklch(0.65 0.26 20 / 0.4)",
-                  "0 0 10px oklch(0.65 0.26 20 / 0.8)",
-                  "0 0 4px oklch(0.65 0.26 20 / 0.4)",
+                  "0 0 4px var(--theme-primary-glow)",
+                  "0 0 10px var(--theme-primary)",
+                  "0 0 4px var(--theme-primary-glow)",
                 ],
               }}
               transition={{

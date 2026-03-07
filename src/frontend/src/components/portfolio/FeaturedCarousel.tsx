@@ -5,18 +5,19 @@ import type { Project } from "../../backend";
 import { useProjectImages } from "../../hooks/useProjectImages";
 import { getProjectExtra } from "../../lib/localDataStore";
 
+// Category colors use CSS variables so they adapt to the active theme
 const CATEGORY_COLORS: Record<string, string> = {
-  "Web Dev": "oklch(0.65 0.26 20 / 0.2)",
-  Design: "oklch(0.55 0.28 15 / 0.2)",
-  AI: "oklch(0.60 0.25 25 / 0.2)",
-  Editing: "oklch(0.70 0.22 30 / 0.2)",
+  "Web Dev": "var(--theme-primary-mid)",
+  Design: "var(--theme-accent-dim)",
+  AI: "var(--theme-primary-dim)",
+  Editing: "var(--theme-primary-border)",
 };
 
 const CATEGORY_TEXT: Record<string, string> = {
-  "Web Dev": "oklch(0.75 0.24 22)",
-  Design: "oklch(0.70 0.26 18)",
-  AI: "oklch(0.72 0.22 28)",
-  Editing: "oklch(0.78 0.20 32)",
+  "Web Dev": "var(--theme-text-primary)",
+  Design: "var(--theme-text-secondary)",
+  AI: "var(--theme-text-primary)",
+  Editing: "var(--theme-text-secondary)",
 };
 
 const STATUS_MAP = {
@@ -88,7 +89,7 @@ function ProjectCard({ project, isCenter }: ProjectCardProps) {
         className="relative rounded-2xl overflow-hidden glass transition-all duration-300 group-hover:border-primary/40"
         style={{
           boxShadow: isCenter
-            ? "0 20px 60px oklch(0 0 0 / 0.6), 0 0 0 1px oklch(0.65 0.26 20 / 0.35), 0 0 24px oklch(0.65 0.26 20 / 0.12)"
+            ? "0 20px 60px oklch(0 0 0 / 0.6), 0 0 0 1px var(--theme-primary-glow), 0 0 24px var(--theme-primary-dim)"
             : "0 8px 32px oklch(0 0 0 / 0.4)",
         }}
       >
@@ -205,7 +206,7 @@ function ProjectCard({ project, isCenter }: ProjectCardProps) {
                     height: "5px",
                     background:
                       i === imgIndex
-                        ? "oklch(0.65 0.26 20)"
+                        ? "var(--theme-primary)"
                         : "oklch(1 0 0 / 0.5)",
                   }}
                   aria-label={`Image ${i + 1}`}
@@ -264,9 +265,9 @@ function ProjectCard({ project, isCenter }: ProjectCardProps) {
                   key={tag}
                   className="text-xs px-2 py-0.5 rounded"
                   style={{
-                    background: "oklch(0.65 0.26 20 / 0.1)",
-                    color: "oklch(0.72 0.16 22)",
-                    border: "1px solid oklch(0.65 0.26 20 / 0.2)",
+                    background: "var(--theme-primary-dim)",
+                    color: "var(--theme-text-secondary)",
+                    border: "1px solid var(--theme-border-line)",
                   }}
                 >
                   {tag}
@@ -344,12 +345,12 @@ export default function FeaturedCarousel({ projects }: FeaturedCarouselProps) {
 
   return (
     <section id="featured" className="py-24 overflow-hidden relative">
-      {/* Red neon background accent */}
+      {/* Theme background accent */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
           background:
-            "radial-gradient(ellipse at 50% 50%, oklch(0.65 0.26 20 / 0.04) 0%, transparent 60%)",
+            "radial-gradient(ellipse at 50% 50%, var(--theme-primary-low) 0%, transparent 60%)",
         }}
       />
 
@@ -364,19 +365,19 @@ export default function FeaturedCarousel({ projects }: FeaturedCarouselProps) {
           <div className="flex items-center gap-3 mb-3">
             <motion.div
               className="h-px flex-1 max-w-12"
-              style={{ background: "oklch(0.65 0.26 20)" }}
+              style={{ background: "var(--theme-primary)" }}
               animate={{
                 boxShadow: [
-                  "0 0 4px oklch(0.65 0.26 20 / 0.4)",
-                  "0 0 8px oklch(0.65 0.26 20 / 0.8)",
-                  "0 0 4px oklch(0.65 0.26 20 / 0.4)",
+                  "0 0 4px var(--theme-primary-glow)",
+                  "0 0 8px var(--theme-primary)",
+                  "0 0 4px var(--theme-primary-glow)",
                 ],
               }}
               transition={{ duration: 2, repeat: Number.POSITIVE_INFINITY }}
             />
             <span
               className="text-sm font-semibold uppercase tracking-widest"
-              style={{ color: "oklch(0.75 0.24 22)" }}
+              style={{ color: "var(--theme-text-primary)" }}
             >
               Featured Work
             </span>
@@ -402,19 +403,19 @@ export default function FeaturedCarousel({ projects }: FeaturedCarouselProps) {
               onClick={goPrev}
               className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200 z-10"
               style={{
-                background: "oklch(0.65 0.26 20 / 0.12)",
-                border: "1px solid oklch(0.65 0.26 20 / 0.3)",
-                color: "oklch(0.75 0.22 22)",
+                background: "var(--theme-primary-dim)",
+                border: "1px solid var(--theme-primary-border)",
+                color: "var(--theme-text-primary)",
               }}
               onMouseEnter={(e) => {
                 (e.currentTarget as HTMLElement).style.background =
-                  "oklch(0.65 0.26 20 / 0.25)";
+                  "var(--theme-primary-mid)";
                 (e.currentTarget as HTMLElement).style.boxShadow =
-                  "0 0 12px oklch(0.65 0.26 20 / 0.4)";
+                  "0 0 12px var(--theme-primary-glow)";
               }}
               onMouseLeave={(e) => {
                 (e.currentTarget as HTMLElement).style.background =
-                  "oklch(0.65 0.26 20 / 0.12)";
+                  "var(--theme-primary-dim)";
                 (e.currentTarget as HTMLElement).style.boxShadow = "none";
               }}
               data-ocid="carousel.pagination_prev"
@@ -493,19 +494,19 @@ export default function FeaturedCarousel({ projects }: FeaturedCarouselProps) {
               onClick={goNext}
               className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200 z-10"
               style={{
-                background: "oklch(0.65 0.26 20 / 0.12)",
-                border: "1px solid oklch(0.65 0.26 20 / 0.3)",
-                color: "oklch(0.75 0.22 22)",
+                background: "var(--theme-primary-dim)",
+                border: "1px solid var(--theme-primary-border)",
+                color: "var(--theme-text-primary)",
               }}
               onMouseEnter={(e) => {
                 (e.currentTarget as HTMLElement).style.background =
-                  "oklch(0.65 0.26 20 / 0.25)";
+                  "var(--theme-primary-mid)";
                 (e.currentTarget as HTMLElement).style.boxShadow =
-                  "0 0 12px oklch(0.65 0.26 20 / 0.4)";
+                  "0 0 12px var(--theme-primary-glow)";
               }}
               onMouseLeave={(e) => {
                 (e.currentTarget as HTMLElement).style.background =
-                  "oklch(0.65 0.26 20 / 0.12)";
+                  "var(--theme-primary-dim)";
                 (e.currentTarget as HTMLElement).style.boxShadow = "none";
               }}
               data-ocid="carousel.pagination_next"
@@ -531,10 +532,10 @@ export default function FeaturedCarousel({ projects }: FeaturedCarouselProps) {
                   height: "8px",
                   background:
                     i === index
-                      ? "oklch(0.65 0.26 20)"
-                      : "oklch(0.65 0.26 20 / 0.3)",
+                      ? "var(--theme-primary)"
+                      : "var(--theme-primary-border)",
                   boxShadow:
-                    i === index ? "0 0 8px oklch(0.65 0.26 20 / 0.6)" : "none",
+                    i === index ? "0 0 8px var(--theme-primary-glow)" : "none",
                 }}
                 aria-label={`Go to project ${i + 1}`}
               />

@@ -295,6 +295,216 @@ export function saveLocalDesignSettings(settings: DesignSettings): void {
   localStorage.setItem(DESIGN_KEY, JSON.stringify(settings));
 }
 
+/**
+ * Background color values for each bgStyle option (OKLCH lightness chroma hue)
+ */
+const BG_STYLE_MAP: Record<DesignSettings["bgStyle"], string> = {
+  "pure-black": "0.08 0.015 15",
+  "dark-gray": "0.10 0.01 0",
+  "deep-red": "0.09 0.03 15",
+  "deep-blue": "0.08 0.02 235",
+  "deep-purple": "0.08 0.02 280",
+  midnight: "0.08 0.015 230",
+};
+
+/**
+ * Apply design settings to document CSS variables so the portfolio
+ * reflects theme changes immediately without a page reload.
+ *
+ * Key variables exposed (for use in inline styles across all components):
+ *   --theme-primary          : full oklch() color string for the primary
+ *   --theme-primary-dim      : primary at 0.12 opacity
+ *   --theme-primary-mid      : primary at 0.25 opacity
+ *   --theme-primary-border   : primary at 0.30 opacity
+ *   --theme-primary-glow     : primary at 0.40 opacity
+ *   --theme-accent           : full oklch() accent (hue-5)
+ *   --theme-accent-dim       : accent at 0.10 opacity
+ *   --theme-text-primary     : lighter tint of primary (for text)
+ *   --theme-bg               : full oklch() background
+ *   --theme-particle-1..4    : rgba colours for particle canvas
+ */
+export function applyDesignToDOM(settings: DesignSettings): void {
+  const root = document.documentElement;
+  const h = settings.primaryColorHue;
+  const c = settings.primaryColorChroma ?? 0.26;
+  const c2 = Math.min(c + 0.02, 0.37);
+  const h2 = h - 5;
+
+  // ── Tailwind / shadcn CSS-var tokens (L C H fragments, no oklch() wrapper) ──
+  root.style.setProperty("--primary", `0.65 ${c} ${h}`);
+  root.style.setProperty("--ring", `0.65 ${c} ${h}`);
+  root.style.setProperty("--accent", `0.55 ${c2} ${h2}`);
+  root.style.setProperty("--sidebar-primary", `0.65 ${c} ${h}`);
+  root.style.setProperty("--sidebar-ring", `0.65 ${c} ${h}`);
+  root.style.setProperty("--chart-1", `0.65 ${c} ${h}`);
+
+  // ── Background ──────────────────────────────────────────────────────────────
+  const bgValue = BG_STYLE_MAP[settings.bgStyle] ?? BG_STYLE_MAP["pure-black"];
+  root.style.setProperty("--background", bgValue);
+  root.style.setProperty(
+    "--card",
+    bgValue.replace(/^([\d.]+)/, (_, l) =>
+      String(Math.min(Number.parseFloat(l) + 0.03, 0.99)),
+    ),
+  );
+
+  // ── Glow vars (used in keyframe animations in index.css) ────────────────────
+  root.style.setProperty("--glow-red", `oklch(0.65 ${c} ${h} / 0.5)`);
+  root.style.setProperty("--glow-red-strong", `oklch(0.65 ${c} ${h} / 0.85)`);
+  root.style.setProperty("--glow-red-subtle", `oklch(0.65 ${c} ${h} / 0.2)`);
+  root.style.setProperty("--glow-crimson", `oklch(0.55 ${c2} ${h2} / 0.5)`);
+  root.style.setProperty(
+    "--glow-crimson-strong",
+    `oklch(0.55 ${c2} ${h2} / 0.85)`,
+  );
+
+  // ── Theme helper vars (full oklch strings, for use in inline style={{}}) ────
+  // Use these in components instead of hardcoded oklch(0.65 0.26 20 / ...)
+  root.style.setProperty("--theme-primary", `oklch(0.65 ${c} ${h})`);
+  root.style.setProperty("--theme-primary-dim", `oklch(0.65 ${c} ${h} / 0.12)`);
+  root.style.setProperty("--theme-primary-low", `oklch(0.65 ${c} ${h} / 0.08)`);
+  root.style.setProperty("--theme-primary-mid", `oklch(0.65 ${c} ${h} / 0.25)`);
+  root.style.setProperty(
+    "--theme-primary-border",
+    `oklch(0.65 ${c} ${h} / 0.30)`,
+  );
+  root.style.setProperty(
+    "--theme-primary-glow",
+    `oklch(0.65 ${c} ${h} / 0.40)`,
+  );
+  root.style.setProperty(
+    "--theme-primary-glow2",
+    `oklch(0.65 ${c} ${h} / 0.15)`,
+  );
+  root.style.setProperty(
+    "--theme-primary-glow-sm",
+    `oklch(0.65 ${c} ${h} / 0.07)`,
+  );
+  root.style.setProperty("--theme-accent", `oklch(0.55 ${c2} ${h2})`);
+  root.style.setProperty(
+    "--theme-accent-dim",
+    `oklch(0.55 ${c2} ${h2} / 0.10)`,
+  );
+  root.style.setProperty(
+    "--theme-accent-border",
+    `oklch(0.55 ${c2} ${h2} / 0.30)`,
+  );
+  root.style.setProperty(
+    "--theme-text-primary",
+    `oklch(0.75 ${c * 0.92} ${h})`,
+  );
+  root.style.setProperty(
+    "--theme-text-secondary",
+    `oklch(0.70 ${c * 0.85} ${h + 2})`,
+  );
+  root.style.setProperty("--theme-bg", `oklch(${bgValue})`);
+  root.style.setProperty("--theme-border-line", `oklch(0.65 ${c} ${h} / 0.20)`);
+
+  // Particle canvas colours (rgba format used in canvas API)
+  // Approximated from OKLCH → sRGB for hue families
+  const particleRgb = hueToParticleRgb(h);
+  root.style.setProperty("--theme-particle-1", `rgba(${particleRgb[0]},`);
+  root.style.setProperty("--theme-particle-2", `rgba(${particleRgb[1]},`);
+  root.style.setProperty("--theme-particle-3", `rgba(${particleRgb[2]},`);
+  root.style.setProperty("--theme-particle-4", `rgba(${particleRgb[3]},`);
+
+  // ── Body background ──────────────────────────────────────────────────────────
+  document.body.style.backgroundColor = `oklch(${bgValue})`;
+  document.body.style.backgroundImage = [
+    `radial-gradient(ellipse 80% 50% at 20% -10%, oklch(0.65 ${c} ${h} / 0.07) 0%, transparent 60%)`,
+    `radial-gradient(ellipse 60% 40% at 80% 100%, oklch(0.55 ${c2} ${h2} / 0.05) 0%, transparent 60%)`,
+  ].join(", ");
+
+  // ── Fonts ────────────────────────────────────────────────────────────────────
+  root.style.setProperty(
+    "--font-heading",
+    `${settings.fontHeading}, sans-serif`,
+  );
+  root.style.setProperty("--font-body", `${settings.fontBody}, sans-serif`);
+
+  // ── Animations ───────────────────────────────────────────────────────────────
+  if (!settings.animationsEnabled) {
+    root.style.setProperty("--animation-duration", "0s");
+  } else {
+    root.style.removeProperty("--animation-duration");
+  }
+
+  // ── gradient-text utility (update dynamically) ───────────────────────────────
+  // Inject a <style> tag with the current gradient-text definition
+  let dynStyle = document.getElementById(
+    "__theme-gradient-text",
+  ) as HTMLStyleElement | null;
+  if (!dynStyle) {
+    dynStyle = document.createElement("style");
+    dynStyle.id = "__theme-gradient-text";
+    document.head.appendChild(dynStyle);
+  }
+  dynStyle.textContent = `
+    .gradient-text {
+      background: linear-gradient(135deg, oklch(0.78 ${c * 0.92} ${h + 2}), oklch(0.55 ${c2} ${h2})) !important;
+      -webkit-background-clip: text !important;
+      -webkit-text-fill-color: transparent !important;
+      background-clip: text !important;
+    }
+    .gradient-text-alt {
+      background: linear-gradient(135deg, oklch(0.55 ${c2} ${h2}), oklch(0.78 ${c * 0.92} ${h + 2})) !important;
+      -webkit-background-clip: text !important;
+      -webkit-text-fill-color: transparent !important;
+      background-clip: text !important;
+    }
+    .glass-red {
+      background: oklch(0.11 0.02 15 / 0.7) !important;
+      backdrop-filter: blur(20px) saturate(200%) !important;
+      -webkit-backdrop-filter: blur(20px) saturate(200%) !important;
+      border: 1px solid var(--theme-primary-border) !important;
+      box-shadow: inset 0 0 30px var(--theme-primary-dim), 0 0 20px var(--theme-primary-low) !important;
+    }
+    .neon-border {
+      border: 1px solid var(--theme-primary-glow) !important;
+      box-shadow: 0 0 8px var(--theme-primary-border), inset 0 0 8px var(--theme-primary-dim) !important;
+    }
+    .neon-border-strong {
+      border: 1px solid oklch(0.65 ${c} ${h} / 0.8) !important;
+      box-shadow: 0 0 15px var(--theme-primary-glow), 0 0 30px var(--theme-primary-glow2), inset 0 0 15px var(--theme-primary-dim) !important;
+    }
+  `;
+}
+
+/** Map OKLCH hue to approximate particle RGB strings for canvas rendering */
+function hueToParticleRgb(hue: number): string[] {
+  // Hue families → RGB approximations
+  if (hue < 40) {
+    // Red/Orange-red
+    return ["255, 60, 60", "220, 30, 30", "255, 100, 80", "200, 20, 50"];
+  }
+  if (hue < 80) {
+    // Orange/Yellow
+    return ["255, 160, 30", "230, 130, 20", "255, 200, 50", "210, 100, 10"];
+  }
+  if (hue < 150) {
+    // Green
+    return ["30, 220, 80", "20, 180, 60", "60, 240, 100", "10, 160, 50"];
+  }
+  if (hue < 200) {
+    // Teal/Cyan
+    return ["20, 220, 200", "10, 180, 180", "40, 240, 220", "0, 160, 160"];
+  }
+  if (hue < 260) {
+    // Blue
+    return ["40, 100, 255", "20, 70, 230", "60, 130, 255", "10, 50, 210"];
+  }
+  if (hue < 320) {
+    // Purple/Magenta
+    return ["180, 50, 255", "150, 30, 220", "200, 80, 255", "130, 20, 200"];
+  }
+  if (hue < 360) {
+    // Pink/Rose
+    return ["255, 60, 160", "230, 30, 130", "255, 100, 190", "210, 20, 120"];
+  }
+  // Default: red
+  return ["255, 60, 60", "220, 30, 30", "255, 100, 80", "200, 20, 50"];
+}
+
 // ─── Hero Settings ────────────────────────────────────────────
 
 export interface HeroSettings {

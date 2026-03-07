@@ -15,6 +15,7 @@ import {
 import { getBackend } from "../lib/backendClient";
 import {
   type SocialSettings,
+  applyDesignToDOM,
   getLocalContact,
   getLocalDesignSettings,
   getLocalProjects,
@@ -31,22 +32,9 @@ export default function PortfolioPage() {
   const [social, setSocial] = useState<SocialSettings>({});
   const [loading, setLoading] = useState(true);
 
-  // Apply design settings (font, animation) to document root
+  // Apply ALL design settings (colors, background, fonts, animations) to document root
   useEffect(() => {
-    const settings = getLocalDesignSettings();
-    document.documentElement.style.setProperty(
-      "--font-heading",
-      `${settings.fontHeading}, sans-serif`,
-    );
-    document.documentElement.style.setProperty(
-      "--font-body",
-      `${settings.fontBody}, sans-serif`,
-    );
-    if (!settings.animationsEnabled) {
-      document.documentElement.style.setProperty("--animation-duration", "0s");
-    } else {
-      document.documentElement.style.removeProperty("--animation-duration");
-    }
+    applyDesignToDOM(getLocalDesignSettings());
   }, []);
 
   useEffect(() => {

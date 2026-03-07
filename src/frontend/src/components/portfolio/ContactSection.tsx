@@ -43,9 +43,9 @@ export default function ContactSection({
 }: ContactSectionProps) {
   if (!contact) return null;
 
-  // All icons use red theme to match email icon
-  const redGlow = "oklch(0.65 0.26 20 / 0.5)";
-  const redHover = "oklch(0.78 0.24 22)";
+  // All icons use current theme -- CSS variables are read at render time
+  const redGlow = "var(--theme-primary-glow)";
+  const redHover = "var(--theme-text-primary)";
 
   const socialLinks: SocialLink[] = [
     contact.email && {
@@ -125,12 +125,12 @@ export default function ContactSection({
 
   return (
     <section id="contact" className="py-24 relative overflow-hidden">
-      {/* Background — red neon */}
+      {/* Background gradient */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
           background:
-            "radial-gradient(ellipse at 30% 60%, oklch(0.55 0.28 15 / 0.06) 0%, transparent 55%), radial-gradient(ellipse at 70% 40%, oklch(0.65 0.26 20 / 0.06) 0%, transparent 55%)",
+            "radial-gradient(ellipse at 30% 60%, var(--theme-accent-dim) 0%, transparent 55%), radial-gradient(ellipse at 70% 40%, var(--theme-primary-low) 0%, transparent 55%)",
         }}
       />
 
@@ -146,23 +146,23 @@ export default function ContactSection({
           <div className="flex items-center justify-center gap-3 mb-3">
             <motion.div
               className="h-px w-12"
-              style={{ background: "oklch(0.65 0.26 20)" }}
+              style={{ background: "var(--theme-primary)" }}
               animate={{
                 boxShadow: [
-                  "0 0 4px oklch(0.65 0.26 20 / 0.4)",
-                  "0 0 10px oklch(0.65 0.26 20 / 0.8)",
-                  "0 0 4px oklch(0.65 0.26 20 / 0.4)",
+                  "0 0 4px var(--theme-primary-glow)",
+                  "0 0 10px var(--theme-primary)",
+                  "0 0 4px var(--theme-primary-glow)",
                 ],
               }}
               transition={{ duration: 2, repeat: Number.POSITIVE_INFINITY }}
             />
             <motion.span
               className="text-sm font-semibold uppercase tracking-widest"
-              style={{ color: "oklch(0.75 0.24 22)" }}
+              style={{ color: "var(--theme-text-primary)" }}
               animate={{
                 textShadow: [
                   "0 0 0px transparent",
-                  "0 0 8px oklch(0.65 0.26 20 / 0.5)",
+                  "0 0 8px var(--theme-primary-glow)",
                   "0 0 0px transparent",
                 ],
               }}
@@ -172,12 +172,12 @@ export default function ContactSection({
             </motion.span>
             <motion.div
               className="h-px w-12"
-              style={{ background: "oklch(0.65 0.26 20)" }}
+              style={{ background: "var(--theme-primary)" }}
               animate={{
                 boxShadow: [
-                  "0 0 4px oklch(0.65 0.26 20 / 0.4)",
-                  "0 0 10px oklch(0.65 0.26 20 / 0.8)",
-                  "0 0 4px oklch(0.65 0.26 20 / 0.4)",
+                  "0 0 4px var(--theme-primary-glow)",
+                  "0 0 10px var(--theme-primary)",
+                  "0 0 4px var(--theme-primary-glow)",
                 ],
               }}
               transition={{
@@ -201,12 +201,12 @@ export default function ContactSection({
             transition={{ duration: 0.7 }}
             className="rounded-3xl p-8 md:p-10 mb-8 relative overflow-hidden glass-red"
           >
-            {/* Red decorative orb */}
+            {/* Decorative orb */}
             <motion.div
               className="absolute -top-20 -right-20 w-64 h-64 rounded-full pointer-events-none"
               style={{
                 background:
-                  "radial-gradient(circle, oklch(0.65 0.26 20 / 0.10) 0%, transparent 70%)",
+                  "radial-gradient(circle, var(--theme-primary-dim) 0%, transparent 70%)",
               }}
               animate={{ scale: [1, 1.15, 1], opacity: [0.6, 1, 0.6] }}
               transition={{ duration: 5, repeat: Number.POSITIVE_INFINITY }}
@@ -218,21 +218,21 @@ export default function ContactSection({
                 className="w-20 h-20 rounded-2xl flex items-center justify-center flex-shrink-0"
                 style={{
                   background:
-                    "linear-gradient(135deg, oklch(0.65 0.26 20 / 0.2), oklch(0.55 0.28 15 / 0.2))",
-                  border: "1px solid oklch(0.65 0.26 20 / 0.35)",
+                    "linear-gradient(135deg, var(--theme-primary-mid), var(--theme-accent-dim))",
+                  border: "1px solid var(--theme-primary-glow)",
                 }}
                 animate={{
                   boxShadow: [
-                    "0 0 8px oklch(0.65 0.26 20 / 0.2)",
-                    "0 0 20px oklch(0.65 0.26 20 / 0.4)",
-                    "0 0 8px oklch(0.65 0.26 20 / 0.2)",
+                    "0 0 8px var(--theme-primary-border)",
+                    "0 0 20px var(--theme-primary-glow)",
+                    "0 0 8px var(--theme-primary-border)",
                   ],
                 }}
                 transition={{ duration: 3, repeat: Number.POSITIVE_INFINITY }}
               >
                 <User
                   className="w-9 h-9"
-                  style={{ color: "oklch(0.75 0.24 22 / 0.7)" }}
+                  style={{ color: "var(--theme-text-primary)", opacity: 0.7 }}
                 />
               </motion.div>
 
@@ -242,7 +242,7 @@ export default function ContactSection({
                 </h3>
                 <p
                   className="text-sm font-medium mb-3"
-                  style={{ color: "oklch(0.75 0.24 22)" }}
+                  style={{ color: "var(--theme-text-primary)" }}
                 >
                   {contact.title}
                 </p>
@@ -280,9 +280,9 @@ export default function ContactSection({
                         whileTap={{ scale: 0.95 }}
                         animate={{
                           boxShadow: [
-                            "0 0 6px oklch(0.65 0.26 20 / 0.35), inset 0 0 6px oklch(0.65 0.26 20 / 0.08)",
-                            "0 0 14px oklch(0.65 0.26 20 / 0.65), inset 0 0 10px oklch(0.65 0.26 20 / 0.15)",
-                            "0 0 6px oklch(0.65 0.26 20 / 0.35), inset 0 0 6px oklch(0.65 0.26 20 / 0.08)",
+                            "0 0 6px var(--theme-primary-border), inset 0 0 6px var(--theme-primary-low)",
+                            "0 0 14px var(--theme-primary-glow), inset 0 0 10px var(--theme-primary-dim)",
+                            "0 0 6px var(--theme-primary-border), inset 0 0 6px var(--theme-primary-low)",
                           ],
                         }}
                         transition={{
@@ -296,27 +296,27 @@ export default function ContactSection({
                         style={{
                           width: "46px",
                           height: "46px",
-                          background: "oklch(0.65 0.26 20 / 0.08)",
-                          border: "1.5px solid oklch(0.65 0.26 20 / 0.45)",
+                          background: "var(--theme-primary-low)",
+                          border: "1.5px solid var(--theme-primary-glow)",
                         }}
                         onMouseEnter={(e) => {
                           const el = e.currentTarget as HTMLElement;
-                          el.style.background = "oklch(0.65 0.26 20 / 0.2)";
-                          el.style.borderColor = "oklch(0.65 0.26 20 / 0.8)";
+                          el.style.background = "var(--theme-primary-mid)";
+                          el.style.borderColor = "var(--theme-primary)";
                           el.style.boxShadow =
-                            "0 0 20px oklch(0.65 0.26 20 / 0.7), 0 0 40px oklch(0.65 0.26 20 / 0.3)";
+                            "0 0 20px var(--theme-primary-glow), 0 0 40px var(--theme-primary-border)";
                         }}
                         onMouseLeave={(e) => {
                           const el = e.currentTarget as HTMLElement;
-                          el.style.background = "oklch(0.65 0.26 20 / 0.08)";
-                          el.style.borderColor = "oklch(0.65 0.26 20 / 0.45)";
+                          el.style.background = "var(--theme-primary-low)";
+                          el.style.borderColor = "var(--theme-primary-glow)";
                           el.style.boxShadow = "";
                         }}
                       >
                         <link.icon
                           size={18}
                           className="transition-colors duration-200"
-                          color="oklch(0.78 0.24 22)"
+                          color="var(--theme-text-primary)"
                         />
                       </motion.a>
                     </TooltipTrigger>
@@ -325,7 +325,7 @@ export default function ContactSection({
                       className="text-xs font-medium"
                       style={{
                         background: "oklch(0.1 0.01 15)",
-                        border: "1px solid oklch(0.65 0.26 20 / 0.3)",
+                        border: "1px solid var(--theme-primary-border)",
                         color: "oklch(0.85 0 0)",
                       }}
                     >

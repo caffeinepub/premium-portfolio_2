@@ -34,13 +34,21 @@ function ParticleCanvas() {
     resize();
     window.addEventListener("resize", resize);
 
-    // Red neon particles
-    const colors = [
-      "rgba(255, 60, 60,",
-      "rgba(220, 30, 30,",
-      "rgba(255, 100, 80,",
-      "rgba(200, 20, 50,",
-    ];
+    // Dynamic theme particles -- read from CSS variables set by applyDesignToDOM
+    const style = getComputedStyle(document.documentElement);
+    const p1 =
+      style.getPropertyValue("--theme-particle-1").trim() ||
+      "rgba(255, 60, 60,";
+    const p2 =
+      style.getPropertyValue("--theme-particle-2").trim() ||
+      "rgba(220, 30, 30,";
+    const p3 =
+      style.getPropertyValue("--theme-particle-3").trim() ||
+      "rgba(255, 100, 80,";
+    const p4 =
+      style.getPropertyValue("--theme-particle-4").trim() ||
+      "rgba(200, 20, 50,";
+    const colors = [p1, p2, p3, p4];
 
     const count = Math.min(
       80,
@@ -69,7 +77,7 @@ function ParticleCanvas() {
             ctx.beginPath();
             ctx.moveTo(particles[i].x, particles[i].y);
             ctx.lineTo(particles[j].x, particles[j].y);
-            ctx.strokeStyle = `rgba(255, 60, 60, ${alpha})`;
+            ctx.strokeStyle = `${p1}${alpha})`;
             ctx.lineWidth = 0.5;
             ctx.stroke();
           }
@@ -161,19 +169,14 @@ export default function HeroSection({
       id="hero"
       className="relative min-h-screen flex items-center justify-center overflow-hidden"
     >
-      {/* Pure black background with red neon gradients */}
-      <div
-        className="absolute inset-0"
-        style={{
-          background: "oklch(0.06 0.01 15)",
-        }}
-      />
-      {/* Red neon gradient overlays */}
+      {/* Background */}
+      <div className="absolute inset-0 bg-background" />
+      {/* Theme gradient overlays */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
           background:
-            "radial-gradient(ellipse 80% 60% at 50% 30%, oklch(0.65 0.26 20 / 0.12) 0%, transparent 65%), radial-gradient(ellipse 50% 40% at 20% 70%, oklch(0.55 0.28 15 / 0.08) 0%, transparent 60%), radial-gradient(ellipse 40% 50% at 80% 60%, oklch(0.65 0.26 20 / 0.07) 0%, transparent 60%)",
+            "radial-gradient(ellipse 80% 60% at 50% 30%, var(--theme-primary-dim) 0%, transparent 65%), radial-gradient(ellipse 50% 40% at 20% 70%, var(--theme-accent-dim) 0%, transparent 60%), radial-gradient(ellipse 40% 50% at 80% 60%, var(--theme-primary-glow-sm) 0%, transparent 60%)",
         }}
       />
       {/* Bottom fade to background */}
@@ -182,15 +185,13 @@ export default function HeroSection({
       {/* Particle canvas */}
       <ParticleCanvas />
 
-      {/* Floating red orbs */}
+      {/* Floating theme orbs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <motion.div
-          className="absolute w-96 h-96 rounded-full"
+          className="relative px-8 py-6 text-base font-semibold bg-primary text-primary-foreground transition-all duration-300"
           style={{
-            background:
-              "radial-gradient(circle, oklch(0.65 0.26 20 / 0.12) 0%, transparent 70%)",
-            top: "10%",
-            left: "5%",
+            boxShadow:
+              "0 0 20px var(--theme-primary-glow), 0 0 40px var(--theme-primary-glow2)",
           }}
           animate={{ scale: [1, 1.2, 1], opacity: [0.5, 0.8, 0.5] }}
           transition={{
@@ -203,7 +204,7 @@ export default function HeroSection({
           className="absolute w-80 h-80 rounded-full"
           style={{
             background:
-              "radial-gradient(circle, oklch(0.55 0.28 15 / 0.10) 0%, transparent 70%)",
+              "radial-gradient(circle, var(--theme-accent-dim) 0%, transparent 70%)",
             top: "20%",
             right: "8%",
           }}
@@ -219,7 +220,7 @@ export default function HeroSection({
           className="absolute w-64 h-64 rounded-full"
           style={{
             background:
-              "radial-gradient(circle, oklch(0.65 0.26 20 / 0.08) 0%, transparent 70%)",
+              "radial-gradient(circle, var(--theme-primary-low) 0%, transparent 70%)",
             bottom: "20%",
             left: "15%",
           }}
@@ -242,12 +243,12 @@ export default function HeroSection({
         >
           <motion.div
             className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass mb-8 text-sm font-medium text-muted-foreground"
-            style={{ border: "1px solid oklch(0.65 0.26 20 / 0.3)" }}
+            style={{ border: "1px solid var(--theme-primary-border)" }}
             animate={{
               boxShadow: [
-                "0 0 8px oklch(0.65 0.26 20 / 0.2)",
-                "0 0 16px oklch(0.65 0.26 20 / 0.4)",
-                "0 0 8px oklch(0.65 0.26 20 / 0.2)",
+                "0 0 8px var(--theme-primary-glow2)",
+                "0 0 16px var(--theme-primary-glow)",
+                "0 0 8px var(--theme-primary-glow2)",
               ],
             }}
             transition={{ duration: 3, repeat: Number.POSITIVE_INFINITY }}
@@ -269,7 +270,7 @@ export default function HeroSection({
             animate={{
               textShadow: [
                 "0 0 0px transparent",
-                "0 0 20px oklch(0.65 0.26 20 / 0.15)",
+                "0 0 20px var(--theme-primary-glow2)",
                 "0 0 0px transparent",
               ],
             }}
@@ -282,9 +283,9 @@ export default function HeroSection({
             className="gradient-text"
             animate={{
               filter: [
-                "drop-shadow(0 0 8px oklch(0.65 0.26 20 / 0.4))",
-                "drop-shadow(0 0 20px oklch(0.65 0.26 20 / 0.7))",
-                "drop-shadow(0 0 8px oklch(0.65 0.26 20 / 0.4))",
+                "drop-shadow(0 0 8px var(--theme-primary-glow))",
+                "drop-shadow(0 0 20px var(--theme-primary))",
+                "drop-shadow(0 0 8px var(--theme-primary-glow))",
               ],
             }}
             transition={{ duration: 3, repeat: Number.POSITIVE_INFINITY }}
@@ -323,7 +324,7 @@ export default function HeroSection({
               className="relative px-8 py-6 text-base font-semibold bg-primary text-primary-foreground transition-all duration-300"
               style={{
                 boxShadow:
-                  "0 0 20px oklch(0.65 0.26 20 / 0.4), 0 0 40px oklch(0.65 0.26 20 / 0.15)",
+                  "0 0 20px var(--theme-primary-glow), 0 0 40px var(--theme-primary-glow2)",
               }}
               onClick={() => scrollToSection("projects")}
               data-ocid="hero.primary_button"
@@ -336,7 +337,7 @@ export default function HeroSection({
               size="lg"
               variant="outline"
               className="px-8 py-6 text-base font-semibold glass hover:border-primary/60 transition-all duration-300"
-              style={{ borderColor: "oklch(0.65 0.26 20 / 0.3)" }}
+              style={{ borderColor: "var(--theme-primary-border)" }}
               onClick={() => scrollToSection("contact")}
               data-ocid="hero.secondary_button"
             >
@@ -348,7 +349,7 @@ export default function HeroSection({
         {/* Stats row */}
         <motion.div
           className="flex flex-wrap items-center justify-center gap-8 mt-16 pt-8"
-          style={{ borderTop: "1px solid oklch(0.65 0.26 20 / 0.2)" }}
+          style={{ borderTop: "1px solid var(--theme-border-line)" }}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 1, delay: 0.8 }}
