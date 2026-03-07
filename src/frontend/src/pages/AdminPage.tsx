@@ -57,6 +57,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { ContactInfo, Project, Review } from "../backend";
+import { deleteImages, loadImages, saveImages } from "../lib/imageStore";
 import {
   type CustomSkill,
   DEFAULT_DESIGN_SETTINGS,
@@ -250,6 +251,17 @@ function AdminLogin({ onSuccess }: { onSuccess: () => void }) {
 // ─────────────────────────────────────────
 // Project Form
 // ─────────────────────────────────────────
+
+/** A single image slot -- can be a new File (to be saved) or an existing stored ID */
+interface ImageSlot {
+  /** Preview URL for display (object URL for new files, or loaded data URL for existing) */
+  previewUrl: string;
+  /** If this is a brand-new file picked by the user */
+  file?: File;
+  /** If this already exists in IndexedDB, its stored ID */
+  existingId?: string;
+}
+
 interface ProjectFormData {
   title: string;
   description: string;
@@ -262,8 +274,8 @@ interface ProjectFormData {
   techTags: string;
   status: "completed" | "in-progress" | "concept";
   year: string;
-  // image upload
-  uploadedImages: string[]; // base64 data URLs
+  // image upload -- uses slots, not raw base64
+  imageSlots: ImageSlot[];
   urlInputVisible: boolean; // toggle for the URL fallback
 }
 
@@ -278,7 +290,7 @@ const EMPTY_PROJECT: ProjectFormData = {
   techTags: "",
   status: "completed",
   year: new Date().getFullYear().toString(),
-  uploadedImages: [],
+  imageSlots: [],
   urlInputVisible: false,
 };
 
@@ -312,7 +324,7 @@ function ProjectDialog({
   const [dragging, setDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Convert selected files to base64 and add to uploadedImages
+  // Add new files as slots with object URL previews (no base64, no localStorage bloat)
   const handleFilesSelected = (files: FileList | null) => {
     if (!files || files.length === 0) return;
     const imageFiles = Array.from(files).filter((f) =>
@@ -320,45 +332,29 @@ function ProjectDialog({
     );
     if (imageFiles.length === 0) return;
 
-    // Size warning: rough estimate (~1.37x for base64 overhead)
-    const totalBytes = imageFiles.reduce((sum, f) => sum + f.size, 0);
-    const currentBase64Bytes = form.uploadedImages.reduce(
-      (sum, img) => sum + img.length,
-      0,
-    );
-    if (currentBase64Bytes + totalBytes * 1.37 > 5 * 1024 * 1024) {
-      toast.warning(
-        "Total image size may exceed 5MB — consider using smaller images",
-      );
-    }
+    const newSlots: ImageSlot[] = imageFiles.map((file) => ({
+      previewUrl: URL.createObjectURL(file),
+      file,
+    }));
 
-    Promise.all(
-      imageFiles.map(
-        (file) =>
-          new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-          }),
-      ),
-    )
-      .then((newImages) => {
-        setForm((prev) => ({
-          ...prev,
-          uploadedImages: [...prev.uploadedImages, ...newImages],
-        }));
-      })
-      .catch(() => {
-        toast.error("Failed to read some images");
-      });
+    setForm((prev) => ({
+      ...prev,
+      imageSlots: [...prev.imageSlots, ...newSlots],
+    }));
   };
 
   const handleRemoveImage = (index: number) => {
-    setForm((prev) => ({
-      ...prev,
-      uploadedImages: prev.uploadedImages.filter((_, i) => i !== index),
-    }));
+    setForm((prev) => {
+      const slot = prev.imageSlots[index];
+      // Revoke object URL to free memory if it was a new file
+      if (slot.file && slot.previewUrl.startsWith("blob:")) {
+        URL.revokeObjectURL(slot.previewUrl);
+      }
+      return {
+        ...prev,
+        imageSlots: prev.imageSlots.filter((_, i) => i !== index),
+      };
+    });
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -377,29 +373,61 @@ function ProjectDialog({
   useEffect(() => {
     if (project) {
       const extras = getProjectExtra(project.id.toString());
-      const extraImages = extras?.extraImages ?? [];
-      // Determine if imageUrl looks like an uploaded base64 image
-      const isBase64 = project.imageUrl.startsWith("data:image/");
-      const allImages = isBase64
-        ? [
-            project.imageUrl,
-            ...extraImages.filter((img) => img !== project.imageUrl),
-          ]
-        : extraImages;
-      setForm({
-        title: project.title,
-        description: project.description,
-        imageUrl: isBase64 ? "" : project.imageUrl,
-        category: project.category,
-        link: project.link,
-        featured: project.featured,
-        order: project.order.toString(),
-        techTags: extras?.techTags?.join(", ") ?? "",
-        status: extras?.status ?? "completed",
-        year: extras?.year ?? new Date().getFullYear().toString(),
-        uploadedImages: allImages,
-        urlInputVisible: !isBase64 && !!project.imageUrl,
-      });
+      const imageIds = extras?.imageIds ?? [];
+
+      // Load existing images from IndexedDB as preview slots
+      const loadExistingImages = async () => {
+        let slots: ImageSlot[] = [];
+
+        if (imageIds.length > 0) {
+          const loaded = await loadImages(imageIds);
+          slots = imageIds
+            .map((id, i) => ({
+              previewUrl: loaded[i] ?? "",
+              existingId: id,
+            }))
+            .filter((s) => s.previewUrl !== "");
+        } else if (project.imageUrl.startsWith("idb:")) {
+          // New format: primary image is stored in IndexedDB with this ID
+          const id = project.imageUrl.slice(4);
+          const loaded = await loadImages([id]);
+          if (loaded[0]) {
+            slots = [{ previewUrl: loaded[0], existingId: id }];
+          }
+        } else if (extras?.extraImages && extras.extraImages.length > 0) {
+          // Migration: old base64 data in extraImages
+          slots = extras.extraImages.map((dataUrl) => ({
+            previewUrl: dataUrl,
+          }));
+        } else if (project.imageUrl.startsWith("data:image/")) {
+          // Old single base64 primary image
+          slots = [{ previewUrl: project.imageUrl }];
+        }
+
+        // Determine URL input visibility: only show if imageUrl is a plain http(s) URL
+        const isIdbRef = project.imageUrl.startsWith("idb:");
+        const isBase64 = project.imageUrl.startsWith("data:image/");
+        const isHttpUrl = project.imageUrl.startsWith("http");
+
+        setForm({
+          title: project.title,
+          description: project.description,
+          imageUrl: isHttpUrl ? project.imageUrl : "",
+          category: project.category,
+          link: project.link,
+          featured: project.featured,
+          order: project.order.toString(),
+          techTags: extras?.techTags?.join(", ") ?? "",
+          status: extras?.status ?? "completed",
+          year: extras?.year ?? new Date().getFullYear().toString(),
+          imageSlots: slots,
+          urlInputVisible: isHttpUrl,
+        });
+        void isIdbRef;
+        void isBase64; // suppress unused warnings
+      };
+
+      loadExistingImages();
     } else {
       setForm(EMPTY_PROJECT);
     }
@@ -410,13 +438,52 @@ function ProjectDialog({
     .map((t) => t.trim())
     .filter(Boolean);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.title.trim()) return;
     setSaving(true);
     try {
-      // Resolve the primary imageUrl: uploaded images take priority over URL
+      const projectIdStr = project
+        ? project.id.toString()
+        : `new_${Date.now()}`;
+
+      // Convert all slots to data URLs for IndexedDB storage
+      // For new files (File object), read as data URL
+      // For existing slots (existingId), keep as-is in IndexedDB
+      const dataUrlPromises = form.imageSlots.map(async (slot) => {
+        if (slot.file) {
+          // New file -- convert to data URL for storage
+          return new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(slot.file!);
+          });
+        }
+        if (slot.existingId) {
+          // Already stored -- load from IndexedDB
+          const existing = await loadImages([slot.existingId]);
+          return existing[0] ?? slot.previewUrl;
+        }
+        // Old base64 slot (migration path)
+        return slot.previewUrl;
+      });
+
+      const dataUrls = await Promise.all(dataUrlPromises);
+
+      // Save all images to IndexedDB, get back IDs
+      const oldIds = getProjectExtra(projectIdStr)?.imageIds ?? [];
+      const imageIds = await saveImages(projectIdStr, dataUrls, oldIds);
+
+      // Clean up old IDs that are no longer used
+      const removedIds = oldIds.filter((id) => !imageIds.includes(id));
+      if (removedIds.length > 0) {
+        await deleteImages(removedIds);
+      }
+
+      // Use first image ID as primary reference (stored as "idb:<id>" in project record)
+      // This avoids storing large base64 data in localStorage which causes quota errors
       const primaryImage =
-        form.uploadedImages.length > 0 ? form.uploadedImages[0] : form.imageUrl;
+        imageIds.length > 0 ? `idb:${imageIds[0]}` : form.imageUrl || "";
 
       let savedId: bigint;
       if (project) {
@@ -446,7 +513,7 @@ function ProjectDialog({
         toast.success("Project added successfully");
       }
 
-      // Save extras including extraImages (all uploaded images)
+      // Save extras with imageIds (NOT base64 data)
       const extras: ProjectExtras = {
         id: savedId.toString(),
         techTags: form.techTags
@@ -455,13 +522,21 @@ function ProjectDialog({
           .filter(Boolean),
         status: form.status,
         year: form.year,
-        extraImages: form.uploadedImages,
+        imageIds,
       };
       upsertProjectExtra(extras);
 
+      // Revoke any object URLs we created
+      for (const slot of form.imageSlots) {
+        if (slot.file && slot.previewUrl.startsWith("blob:")) {
+          URL.revokeObjectURL(slot.previewUrl);
+        }
+      }
+
       onSaved();
       onClose();
-    } catch {
+    } catch (err) {
+      console.error("Save project error:", err);
       toast.error("Failed to save project");
     } finally {
       setSaving(false);
@@ -616,7 +691,7 @@ function ProjectDialog({
                 <Images className="w-3.5 h-3.5 text-primary" />
                 Project Images
               </Label>
-              {form.uploadedImages.length > 0 && (
+              {form.imageSlots.length > 0 && (
                 <span
                   className="text-xs px-2 py-0.5 rounded-full font-medium"
                   style={{
@@ -625,9 +700,8 @@ function ProjectDialog({
                     color: "oklch(0.78 0.22 22)",
                   }}
                 >
-                  {form.uploadedImages.length}{" "}
-                  {form.uploadedImages.length === 1 ? "image" : "images"}{" "}
-                  selected
+                  {form.imageSlots.length}{" "}
+                  {form.imageSlots.length === 1 ? "image" : "images"} selected
                 </span>
               )}
             </div>
@@ -659,7 +733,7 @@ function ProjectDialog({
                 }}
               />
 
-              {form.uploadedImages.length === 0 ? (
+              {form.imageSlots.length === 0 ? (
                 <button
                   type="button"
                   className="w-full flex flex-col items-center justify-center py-6 px-4 text-center hover:bg-primary/5 transition-colors cursor-pointer"
@@ -685,17 +759,25 @@ function ProjectDialog({
                 <div className="p-3">
                   {/* Thumbnail grid */}
                   <div className="grid grid-cols-3 gap-2">
-                    {form.uploadedImages.map((img, idx) => (
+                    {form.imageSlots.map((slot, idx) => (
                       <div
-                        key={img.slice(0, 60)}
+                        key={
+                          slot.existingId ?? slot.previewUrl.slice(0, 40) + idx
+                        }
                         className="relative group rounded-lg overflow-hidden aspect-video"
                         style={{ background: "oklch(0.12 0.01 15)" }}
                       >
-                        <img
-                          src={img}
-                          alt={`Upload ${idx + 1}`}
-                          className="w-full h-full object-cover"
-                        />
+                        {slot.previewUrl ? (
+                          <img
+                            src={slot.previewUrl}
+                            alt={`Upload ${idx + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                          </div>
+                        )}
                         {idx === 0 && (
                           <div
                             className="absolute top-1 left-1 text-[9px] font-bold px-1.5 py-0.5 rounded"

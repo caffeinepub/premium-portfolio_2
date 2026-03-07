@@ -372,7 +372,13 @@ export interface ProjectExtras {
   techTags: string[];
   status: "completed" | "in-progress" | "concept";
   year: string;
-  extraImages?: string[]; // base64 data URLs for additional uploaded images
+  /**
+   * IDs referencing images stored in IndexedDB via imageStore.ts
+   * We no longer store raw base64 here to avoid localStorage 5MB limit.
+   */
+  imageIds?: string[];
+  /** @deprecated Use imageIds instead. Kept for backwards compat migration. */
+  extraImages?: string[];
 }
 
 const PROJECT_EXTRAS_KEY = "portfolio_project_extras";

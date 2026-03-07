@@ -2,6 +2,7 @@ import { ExternalLink, FolderOpen } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import type { Project } from "../../backend";
+import { useProjectImage } from "../../hooks/useProjectImage";
 
 const CATEGORIES = ["All", "Web Dev", "Design", "AI", "Editing"] as const;
 
@@ -36,6 +37,10 @@ function ProjectCard({ project, index }: { project: Project; index: number }) {
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
   const [visible, setVisible] = useState(false);
   const [hovered, setHovered] = useState(false);
+  const resolvedImage = useProjectImage(
+    project.imageUrl,
+    "/assets/generated/project-ecommerce.dim_800x500.jpg",
+  );
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -87,10 +92,7 @@ function ProjectCard({ project, index }: { project: Project; index: number }) {
         {/* Image */}
         <div className="relative h-48 overflow-hidden flex-shrink-0">
           <img
-            src={
-              project.imageUrl ||
-              "/assets/generated/project-ecommerce.dim_800x500.jpg"
-            }
+            src={resolvedImage}
             alt={project.title}
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
           />

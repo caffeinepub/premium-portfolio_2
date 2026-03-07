@@ -2,6 +2,7 @@ import { ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import type { Project } from "../../backend";
+import { useProjectImage } from "../../hooks/useProjectImage";
 import { getProjectExtra } from "../../lib/localDataStore";
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -35,6 +36,10 @@ function ProjectCard({ project, isCenter }: ProjectCardProps) {
     CATEGORY_COLORS[project.category] || "oklch(0.65 0.26 20 / 0.2)";
   const textColor = CATEGORY_TEXT[project.category] || "oklch(0.75 0.24 22)";
   const status = extras?.status ? STATUS_MAP[extras.status] : null;
+  const resolvedImage = useProjectImage(
+    project.imageUrl,
+    "/assets/generated/project-ecommerce.dim_800x500.jpg",
+  );
 
   return (
     <div
@@ -56,10 +61,7 @@ function ProjectCard({ project, isCenter }: ProjectCardProps) {
         {/* Image */}
         <div className="relative h-48 overflow-hidden">
           <img
-            src={
-              project.imageUrl ||
-              "/assets/generated/project-ecommerce.dim_800x500.jpg"
-            }
+            src={resolvedImage}
             alt={project.title}
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
