@@ -2,7 +2,7 @@ import { ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import type { Project } from "../../backend";
-import { useProjectImage } from "../../hooks/useProjectImage";
+import { useProjectImages } from "../../hooks/useProjectImages";
 import { getProjectExtra } from "../../lib/localDataStore";
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -36,10 +36,42 @@ function ProjectCard({ project, isCenter }: ProjectCardProps) {
     CATEGORY_COLORS[project.category] || "oklch(0.65 0.26 20 / 0.2)";
   const textColor = CATEGORY_TEXT[project.category] || "oklch(0.75 0.24 22)";
   const status = extras?.status ? STATUS_MAP[extras.status] : null;
-  const resolvedImage = useProjectImage(
+
+  // Load ALL images for this project
+  const { images } = useProjectImages(
+    extras?.imageIds,
     project.imageUrl,
     "/assets/generated/project-ecommerce.dim_800x500.jpg",
   );
+
+  // Internal image slider state
+  const [imgIndex, setImgIndex] = useState(0);
+  const [imgDir, setImgDir] = useState(0);
+  const [cardHovered, setCardHovered] = useState(false);
+
+  // Reset image index when project changes
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally reset on project id change
+  useEffect(() => {
+    setImgIndex(0);
+  }, [project.id]);
+
+  const totalImages = images.length;
+  const hasMultiple = totalImages > 1;
+
+  const goImgPrev = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setImgDir(-1);
+    setImgIndex((prev) => (prev - 1 + totalImages) % totalImages);
+  };
+
+  const goImgNext = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setImgDir(1);
+    setImgIndex((prev) => (prev + 1) % totalImages);
+  };
+
+  const currentImage =
+    images[imgIndex] || "/assets/generated/project-ecommerce.dim_800x500.jpg";
 
   return (
     <div
@@ -49,6 +81,8 @@ function ProjectCard({ project, isCenter }: ProjectCardProps) {
         transform: isCenter ? "scale(1)" : "scale(0.93)",
         transition: "opacity 0.4s ease, transform 0.4s ease",
       }}
+      onMouseEnter={() => setCardHovered(true)}
+      onMouseLeave={() => setCardHovered(false)}
     >
       <div
         className="relative rounded-2xl overflow-hidden glass transition-all duration-300 group-hover:border-primary/40"
@@ -58,17 +92,25 @@ function ProjectCard({ project, isCenter }: ProjectCardProps) {
             : "0 8px 32px oklch(0 0 0 / 0.4)",
         }}
       >
-        {/* Image */}
+        {/* Image area with slider */}
         <div className="relative h-48 overflow-hidden">
-          <img
-            src={resolvedImage}
-            alt={project.title}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-          />
+          <AnimatePresence mode="popLayout" custom={imgDir}>
+            <motion.img
+              key={`${project.id}-img-${imgIndex}`}
+              src={currentImage}
+              alt={`${project.title} ${imgIndex + 1}`}
+              className="w-full h-full object-cover absolute inset-0"
+              initial={{ opacity: 0, x: imgDir * 40 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: imgDir * -40 }}
+              transition={{ duration: 0.3, ease: "easeInOut" }}
+            />
+          </AnimatePresence>
+
           <div className="absolute inset-0 bg-gradient-to-t from-card/90 to-transparent" />
 
           {/* Category badge */}
-          <div className="absolute top-3 left-3">
+          <div className="absolute top-3 left-3 z-10">
             <span
               className="px-2.5 py-1 rounded-full text-xs font-medium backdrop-blur-sm"
               style={{
@@ -83,7 +125,7 @@ function ProjectCard({ project, isCenter }: ProjectCardProps) {
 
           {/* Year badge */}
           {extras?.year && (
-            <div className="absolute top-3 right-3">
+            <div className="absolute top-3 right-3 z-10">
               <span
                 className="px-2 py-0.5 rounded-lg text-xs font-medium backdrop-blur-sm"
                 style={{
@@ -103,11 +145,86 @@ function ProjectCard({ project, isCenter }: ProjectCardProps) {
               href={project.link}
               target="_blank"
               rel="noopener noreferrer"
-              className="absolute bottom-3 right-3 p-1.5 rounded-lg glass opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:text-primary"
+              className="absolute bottom-3 right-3 z-10 p-1.5 rounded-lg glass opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:text-primary"
               onClick={(e) => e.stopPropagation()}
             >
               <ExternalLink className="w-4 h-4" />
             </a>
+          )}
+
+          {/* Multi-image navigation arrows (appear on hover when multiple images) */}
+          {hasMultiple && cardHovered && (
+            <>
+              <button
+                type="button"
+                onClick={goImgPrev}
+                className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-7 h-7 rounded-full flex items-center justify-center transition-all duration-200"
+                style={{
+                  background: "oklch(0 0 0 / 0.55)",
+                  border: "1px solid oklch(1 0 0 / 0.15)",
+                  color: "white",
+                }}
+                aria-label="Previous image"
+                data-ocid="featured.img.pagination_prev"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={goImgNext}
+                className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-7 h-7 rounded-full flex items-center justify-center transition-all duration-200"
+                style={{
+                  background: "oklch(0 0 0 / 0.55)",
+                  border: "1px solid oklch(1 0 0 / 0.15)",
+                  color: "white",
+                }}
+                aria-label="Next image"
+                data-ocid="featured.img.pagination_next"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </>
+          )}
+
+          {/* Image dots indicator */}
+          {hasMultiple && (
+            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1">
+              {images.map((_, i) => (
+                <button
+                  // biome-ignore lint/suspicious/noArrayIndexKey: positional dots
+                  key={i}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setImgDir(i > imgIndex ? 1 : -1);
+                    setImgIndex(i);
+                  }}
+                  className="rounded-full transition-all duration-200"
+                  style={{
+                    width: i === imgIndex ? "16px" : "5px",
+                    height: "5px",
+                    background:
+                      i === imgIndex
+                        ? "oklch(0.65 0.26 20)"
+                        : "oklch(1 0 0 / 0.5)",
+                  }}
+                  aria-label={`Image ${i + 1}`}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Image count badge (when not hovered) */}
+          {hasMultiple && !cardHovered && (
+            <div
+              className="absolute bottom-2 right-2 z-10 text-[10px] px-1.5 py-0.5 rounded-md font-medium"
+              style={{
+                background: "oklch(0 0 0 / 0.6)",
+                color: "oklch(0.85 0 0)",
+              }}
+            >
+              {imgIndex + 1}/{totalImages}
+            </div>
           )}
         </div>
 
@@ -189,6 +306,7 @@ export default function FeaturedCarousel({ projects }: FeaturedCarouselProps) {
   const goNext = () => goTo(index + 1, 1);
 
   // Auto-advance every 4s
+  // biome-ignore lint/correctness/useExhaustiveDependencies: index is used to re-schedule timer on manual navigation
   useEffect(() => {
     if (isPaused || total <= 1) return;
     timerRef.current = setTimeout(() => {
@@ -198,7 +316,7 @@ export default function FeaturedCarousel({ projects }: FeaturedCarouselProps) {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [isPaused, total]);
+  }, [isPaused, total, index]);
 
   if (total === 0) return null;
 

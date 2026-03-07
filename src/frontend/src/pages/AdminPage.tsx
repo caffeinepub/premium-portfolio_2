@@ -33,11 +33,15 @@ import {
   ChevronDown,
   ChevronUp,
   Code2,
+  Download,
   Eye,
   EyeOff,
+  FileImage,
+  Globe,
   ImagePlus,
   Images,
   LayoutDashboard,
+  Link2,
   Loader2,
   Lock,
   LogOut,
@@ -46,9 +50,11 @@ import {
   Pencil,
   Plus,
   RefreshCw,
+  Settings,
   Sparkles,
   Star,
   Trash2,
+  Type,
   User,
   X,
   Zap,
@@ -57,15 +63,18 @@ import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { ContactInfo, Project, Review } from "../backend";
+import { sampleProjects } from "../data/sampleData";
 import { deleteImages, loadImages, saveImages } from "../lib/imageStore";
 import {
   type CustomSkill,
   DEFAULT_DESIGN_SETTINGS,
   DEFAULT_HERO_SETTINGS,
+  DEFAULT_SITE_SETTINGS,
   DEFAULT_SOCIAL_SETTINGS,
   type DesignSettings,
   type HeroSettings,
   type ProjectExtras,
+  type SiteSettings,
   type SocialSettings,
   addLocalProject,
   addLocalReview,
@@ -78,11 +87,13 @@ import {
   getLocalProjects,
   getLocalReviews,
   getProjectExtra,
+  getSiteSettings,
   getSocialSettings,
   saveLocalContact,
   saveLocalCustomSkills,
   saveLocalDesignSettings,
   saveLocalHeroSettings,
+  saveSiteSettings,
   saveSocialSettings,
   updateLocalProject,
   updateLocalReview,
@@ -1134,6 +1145,7 @@ interface ProjectsTabProps {
 function ProjectsTab({ onSaved }: ProjectsTabProps) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const [importing, setImporting] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editProject, setEditProject] = useState<Project | null>(null);
 
@@ -1165,26 +1177,79 @@ function ProjectsTab({ onSaved }: ProjectsTabProps) {
     }
   };
 
+  const handleImportDefaults = () => {
+    setImporting(true);
+    try {
+      const existing = getLocalProjects();
+      const existingIds = new Set(existing.map((p) => p.id.toString()));
+      let added = 0;
+      for (const sp of sampleProjects) {
+        if (!existingIds.has(sp.id.toString())) {
+          addLocalProject(
+            sp.title,
+            sp.description,
+            sp.imageUrl,
+            sp.category,
+            sp.link,
+            sp.featured,
+            sp.order,
+          );
+          added++;
+        }
+      }
+      if (added > 0) {
+        toast.success(
+          `${added} default project${added > 1 ? "s" : ""} imported! You can now edit or delete them.`,
+        );
+      } else {
+        toast.info("All default projects are already imported.");
+      }
+      load();
+      onSaved?.();
+    } catch {
+      toast.error("Failed to import default projects");
+    } finally {
+      setImporting(false);
+    }
+  };
+
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
         <div>
           <h2 className="font-display text-xl font-bold">Projects</h2>
           <p className="text-sm text-muted-foreground">
             {projects.length} total
           </p>
         </div>
-        <Button
-          onClick={() => {
-            setEditProject(null);
-            setDialogOpen(true);
-          }}
-          className="bg-primary text-primary-foreground hover:shadow-glow"
-          data-ocid="admin.add_project_button"
-        >
-          <Plus className="w-4 h-4 mr-1.5" />
-          Add Project
-        </Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleImportDefaults}
+            disabled={importing}
+            className="border-border/50 text-muted-foreground hover:text-foreground gap-1.5"
+            data-ocid="admin.import_defaults_button"
+          >
+            {importing ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Download className="w-3.5 h-3.5" />
+            )}
+            Import Defaults
+          </Button>
+          <Button
+            onClick={() => {
+              setEditProject(null);
+              setDialogOpen(true);
+            }}
+            className="bg-primary text-primary-foreground hover:shadow-glow"
+            data-ocid="admin.add_project_button"
+          >
+            <Plus className="w-4 h-4 mr-1.5" />
+            Add Project
+          </Button>
+        </div>
       </div>
 
       {loading ? (
@@ -1200,12 +1265,24 @@ function ProjectsTab({ onSaved }: ProjectsTabProps) {
           data-ocid="admin.projects.empty_state"
         >
           <LayoutDashboard className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
-          <p className="text-muted-foreground">
-            No projects added yet. Click "Add Project" to get started.
+          <p className="text-muted-foreground">No projects added yet.</p>
+          <p className="text-xs text-muted-foreground/60 mt-2 mb-4">
+            Import default projects or add your own.
           </p>
-          <p className="text-xs text-muted-foreground/60 mt-2">
-            Projects you add here will appear on your portfolio automatically.
-          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleImportDefaults}
+            disabled={importing}
+            className="border-primary/30 text-primary hover:bg-primary/10 gap-1.5"
+          >
+            {importing ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Download className="w-3.5 h-3.5" />
+            )}
+            Import Default Projects
+          </Button>
         </div>
       ) : (
         <div className="glass rounded-2xl overflow-hidden">
@@ -1976,21 +2053,117 @@ function HeroTab({ onSaved }: HeroTabProps) {
 // Design Tab
 // ─────────────────────────────────────────
 const FONT_OPTIONS = [
-  { value: "Inter", label: "Inter" },
-  { value: "Outfit", label: "Outfit" },
-  { value: "Sora", label: "Sora" },
-  { value: "Figtree", label: "Figtree" },
-  { value: "Playfair Display", label: "Playfair Display" },
-  { value: "Bricolage Grotesque", label: "Bricolage Grotesque" },
+  { value: "Inter", label: "Inter (Clean)" },
+  { value: "Outfit", label: "Outfit (Modern)" },
+  { value: "Sora", label: "Sora (Rounded)" },
+  { value: "Figtree", label: "Figtree (Friendly)" },
+  { value: "Playfair Display", label: "Playfair (Elegant)" },
+  { value: "Bricolage Grotesque", label: "Bricolage (Bold)" },
+  { value: "Space Grotesk", label: "Space Grotesk (Tech)" },
+  { value: "DM Sans", label: "DM Sans (Minimal)" },
+];
+
+const THEME_PRESETS: Array<{
+  id: DesignSettings["themePreset"];
+  label: string;
+  hue: number;
+  chroma: number;
+  bg: DesignSettings["bgStyle"];
+  color: string;
+  emoji: string;
+}> = [
+  {
+    id: "neon-red",
+    label: "Neon Red",
+    hue: 20,
+    chroma: 0.26,
+    bg: "pure-black",
+    color: "oklch(0.65 0.26 20)",
+    emoji: "🔴",
+  },
+  {
+    id: "neon-blue",
+    label: "Neon Blue",
+    hue: 230,
+    chroma: 0.24,
+    bg: "pure-black",
+    color: "oklch(0.60 0.24 230)",
+    emoji: "🔵",
+  },
+  {
+    id: "neon-green",
+    label: "Neon Green",
+    hue: 145,
+    chroma: 0.24,
+    bg: "pure-black",
+    color: "oklch(0.65 0.24 145)",
+    emoji: "🟢",
+  },
+  {
+    id: "neon-purple",
+    label: "Neon Purple",
+    hue: 280,
+    chroma: 0.26,
+    bg: "pure-black",
+    color: "oklch(0.62 0.26 280)",
+    emoji: "🟣",
+  },
+  {
+    id: "neon-pink",
+    label: "Neon Pink",
+    hue: 330,
+    chroma: 0.28,
+    bg: "pure-black",
+    color: "oklch(0.65 0.28 330)",
+    emoji: "🩷",
+  },
+  {
+    id: "neon-gold",
+    label: "Neon Gold",
+    hue: 60,
+    chroma: 0.22,
+    bg: "dark-gray",
+    color: "oklch(0.75 0.22 60)",
+    emoji: "🟡",
+  },
+  {
+    id: "cyber-teal",
+    label: "Cyber Teal",
+    hue: 185,
+    chroma: 0.22,
+    bg: "dark-gray",
+    color: "oklch(0.65 0.22 185)",
+    emoji: "🩵",
+  },
+  {
+    id: "solar-orange",
+    label: "Solar Orange",
+    hue: 45,
+    chroma: 0.26,
+    bg: "deep-red",
+    color: "oklch(0.70 0.26 45)",
+    emoji: "🟠",
+  },
+  {
+    id: "custom",
+    label: "Custom",
+    hue: 20,
+    chroma: 0.26,
+    bg: "pure-black",
+    color: "oklch(0.65 0.26 20)",
+    emoji: "🎨",
+  },
 ];
 
 const COLOR_PRESETS = [
-  { label: "Red", hue: 20, color: "oklch(0.65 0.26 20)" },
-  { label: "Orange", hue: 40, color: "oklch(0.65 0.24 40)" },
-  { label: "Pink", hue: 330, color: "oklch(0.65 0.26 330)" },
-  { label: "Purple", hue: 280, color: "oklch(0.65 0.24 280)" },
-  { label: "Blue", hue: 230, color: "oklch(0.60 0.22 230)" },
-  { label: "Green", hue: 145, color: "oklch(0.60 0.22 145)" },
+  { label: "Red", hue: 20, chroma: 0.26, color: "oklch(0.65 0.26 20)" },
+  { label: "Orange", hue: 45, chroma: 0.26, color: "oklch(0.68 0.26 45)" },
+  { label: "Gold", hue: 60, chroma: 0.22, color: "oklch(0.75 0.22 60)" },
+  { label: "Green", hue: 145, chroma: 0.24, color: "oklch(0.65 0.24 145)" },
+  { label: "Teal", hue: 185, chroma: 0.22, color: "oklch(0.65 0.22 185)" },
+  { label: "Blue", hue: 230, chroma: 0.24, color: "oklch(0.60 0.24 230)" },
+  { label: "Purple", hue: 280, chroma: 0.26, color: "oklch(0.62 0.26 280)" },
+  { label: "Pink", hue: 330, chroma: 0.28, color: "oklch(0.65 0.28 330)" },
 ];
 
 interface DesignTabProps {
@@ -2018,7 +2191,21 @@ function DesignTab({ onSaved }: DesignTabProps) {
     }
   };
 
-  const previewColor = `oklch(0.65 0.26 ${form.primaryColorHue})`;
+  const previewColor = `oklch(0.65 ${form.primaryColorChroma ?? 0.26} ${form.primaryColorHue})`;
+
+  const applyThemePreset = (preset: (typeof THEME_PRESETS)[0]) => {
+    if (preset.id === "custom") {
+      setForm({ ...form, themePreset: "custom" });
+      return;
+    }
+    setForm({
+      ...form,
+      themePreset: preset.id,
+      primaryColorHue: preset.hue,
+      primaryColorChroma: preset.chroma,
+      bgStyle: preset.bg,
+    });
+  };
 
   return (
     <div>
@@ -2032,13 +2219,59 @@ function DesignTab({ onSaved }: DesignTabProps) {
       </div>
 
       <div className="space-y-5">
+        {/* Theme Presets */}
+        <div className="glass rounded-2xl p-5 space-y-4">
+          <h3 className="font-semibold text-sm text-foreground flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+            Theme Presets
+            <span className="text-xs text-muted-foreground font-normal">
+              (one-click themes)
+            </span>
+          </h3>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {THEME_PRESETS.map((preset) => (
+              <button
+                key={preset.id}
+                type="button"
+                onClick={() => applyThemePreset(preset)}
+                className={`relative rounded-xl p-3 border-2 transition-all duration-200 text-left flex items-center gap-2 ${
+                  form.themePreset === preset.id
+                    ? "border-primary bg-primary/10 shadow-[0_0_10px_oklch(0.65_0.26_20/0.3)]"
+                    : "border-border/30 hover:border-border/60"
+                }`}
+                data-ocid={`design.theme.${preset.id}.button`}
+              >
+                <div
+                  className="w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center text-base"
+                  style={{
+                    background: `radial-gradient(circle, ${preset.color}, oklch(0.15 0.02 ${preset.hue}))`,
+                    boxShadow: `0 0 8px ${preset.color}60`,
+                  }}
+                >
+                  {preset.emoji}
+                </div>
+                <div>
+                  <div className="text-xs font-semibold leading-tight">
+                    {preset.label}
+                  </div>
+                </div>
+                {form.themePreset === preset.id && (
+                  <div className="absolute top-1.5 right-1.5 w-3.5 h-3.5 rounded-full bg-primary flex items-center justify-center">
+                    <span className="text-white text-[7px] font-bold">✓</span>
+                  </div>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Background Style */}
         <div className="glass rounded-2xl p-5 space-y-4">
           <h3 className="font-semibold text-sm text-foreground flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-primary" />
             Background Style
           </h3>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
             {[
               {
                 value: "pure-black" as const,
@@ -2051,28 +2284,42 @@ function DesignTab({ onSaved }: DesignTabProps) {
                 bg: "#111111",
               },
               { value: "deep-red" as const, label: "Deep Red", bg: "#1a0505" },
+              {
+                value: "deep-blue" as const,
+                label: "Deep Blue",
+                bg: "#020614",
+              },
+              {
+                value: "deep-purple" as const,
+                label: "Deep Purple",
+                bg: "#0d0514",
+              },
+              { value: "midnight" as const, label: "Midnight", bg: "#080c14" },
             ].map((opt) => (
               <button
                 key={opt.value}
                 type="button"
-                onClick={() => setForm({ ...form, bgStyle: opt.value })}
-                className={`relative rounded-xl p-3 border-2 transition-all duration-200 text-left ${
+                onClick={() =>
+                  setForm({
+                    ...form,
+                    bgStyle: opt.value,
+                    themePreset: "custom",
+                  })
+                }
+                className={`relative rounded-xl p-2 border-2 transition-all duration-200 text-center ${
                   form.bgStyle === opt.value
-                    ? "border-primary shadow-[0_0_12px_oklch(0.65_0.26_20/0.4)]"
+                    ? "border-primary"
                     : "border-border/30 hover:border-border/60"
                 }`}
                 data-ocid={`design.bg.${opt.value}.button`}
               >
                 <div
-                  className="w-full h-12 rounded-lg mb-2"
+                  className="w-full h-8 rounded-lg mb-1.5"
                   style={{ backgroundColor: opt.bg }}
                 />
-                <span className="text-xs font-medium">{opt.label}</span>
-                {form.bgStyle === opt.value && (
-                  <div className="absolute top-2 right-2 w-4 h-4 rounded-full bg-primary flex items-center justify-center">
-                    <span className="text-white text-[8px] font-bold">✓</span>
-                  </div>
-                )}
+                <span className="text-[10px] font-medium leading-tight block">
+                  {opt.label}
+                </span>
               </button>
             ))}
           </div>
@@ -2092,22 +2339,51 @@ function DesignTab({ onSaved }: DesignTabProps) {
                 boxShadow: `0 0 16px ${previewColor}60`,
               }}
             />
-            <div className="flex-1">
-              <div className="flex justify-between text-xs text-muted-foreground mb-1.5">
-                <span>Hue: {form.primaryColorHue}°</span>
-                <span style={{ color: previewColor }}>Preview</span>
+            <div className="flex-1 space-y-2">
+              <div>
+                <div className="flex justify-between text-xs text-muted-foreground mb-1.5">
+                  <span>Hue: {form.primaryColorHue}°</span>
+                  <span style={{ color: previewColor }}>Color</span>
+                </div>
+                <Slider
+                  value={[form.primaryColorHue]}
+                  onValueChange={([v]) =>
+                    setForm({
+                      ...form,
+                      primaryColorHue: v,
+                      themePreset: "custom",
+                    })
+                  }
+                  min={0}
+                  max={360}
+                  step={1}
+                  className="w-full"
+                  data-ocid="design.color.hue.input"
+                />
               </div>
-              <Slider
-                value={[form.primaryColorHue]}
-                onValueChange={([v]) =>
-                  setForm({ ...form, primaryColorHue: v })
-                }
-                min={0}
-                max={360}
-                step={1}
-                className="w-full"
-                data-ocid="design.color.hue.input"
-              />
+              <div>
+                <div className="flex justify-between text-xs text-muted-foreground mb-1.5">
+                  <span>
+                    Saturation:{" "}
+                    {Math.round((form.primaryColorChroma ?? 0.26) * 100)}%
+                  </span>
+                </div>
+                <Slider
+                  value={[Math.round((form.primaryColorChroma ?? 0.26) * 100)]}
+                  onValueChange={([v]) =>
+                    setForm({
+                      ...form,
+                      primaryColorChroma: v / 100,
+                      themePreset: "custom",
+                    })
+                  }
+                  min={5}
+                  max={37}
+                  step={1}
+                  className="w-full"
+                  data-ocid="design.color.chroma.input"
+                />
+              </div>
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -2116,10 +2392,16 @@ function DesignTab({ onSaved }: DesignTabProps) {
                 key={preset.hue}
                 type="button"
                 onClick={() =>
-                  setForm({ ...form, primaryColorHue: preset.hue })
+                  setForm({
+                    ...form,
+                    primaryColorHue: preset.hue,
+                    primaryColorChroma: preset.chroma,
+                    themePreset: "custom",
+                  })
                 }
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
-                  form.primaryColorHue === preset.hue
+                  form.primaryColorHue === preset.hue &&
+                  form.themePreset === "custom"
                     ? "border-primary bg-primary/10"
                     : "border-border/30 hover:border-border/60"
                 }`}
@@ -2154,7 +2436,73 @@ function DesignTab({ onSaved }: DesignTabProps) {
                 }`}
                 data-ocid={`design.glow.${level}.button`}
               >
-                {level}
+                {level === "low"
+                  ? "⬇ Low"
+                  : level === "medium"
+                    ? "◼ Medium"
+                    : "⬆ High"}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Card & Button Style */}
+        <div className="glass rounded-2xl p-5 space-y-4">
+          <h3 className="font-semibold text-sm text-foreground flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+            Card Style
+          </h3>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {(["glass", "solid", "minimal", "bordered"] as const).map(
+              (style) => (
+                <button
+                  key={style}
+                  type="button"
+                  onClick={() => setForm({ ...form, cardStyle: style })}
+                  className={`py-2.5 px-3 rounded-xl text-xs font-medium border-2 capitalize transition-all ${
+                    form.cardStyle === style
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border/30 text-muted-foreground hover:border-border/60"
+                  }`}
+                  data-ocid={`design.card.${style}.button`}
+                >
+                  {style === "glass"
+                    ? "✨ Glass"
+                    : style === "solid"
+                      ? "■ Solid"
+                      : style === "minimal"
+                        ? "○ Minimal"
+                        : "□ Bordered"}
+                </button>
+              ),
+            )}
+          </div>
+        </div>
+
+        {/* Button Style */}
+        <div className="glass rounded-2xl p-5 space-y-4">
+          <h3 className="font-semibold text-sm text-foreground flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+            Button Style
+          </h3>
+          <div className="grid grid-cols-3 gap-3">
+            {(["rounded", "pill", "sharp"] as const).map((style) => (
+              <button
+                key={style}
+                type="button"
+                onClick={() => setForm({ ...form, buttonStyle: style })}
+                className={`py-2.5 px-4 rounded-xl text-xs font-medium border-2 capitalize transition-all ${
+                  form.buttonStyle === style
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border/30 text-muted-foreground hover:border-border/60"
+                }`}
+                data-ocid={`design.button.${style}.button`}
+              >
+                {style === "rounded"
+                  ? "⬭ Rounded"
+                  : style === "pill"
+                    ? "⬭ Pill"
+                    : "▭ Sharp"}
               </button>
             ))}
           </div>
@@ -2555,6 +2903,388 @@ function SkillsTab({ onSaved }: SkillsTabProps) {
 }
 
 // ─────────────────────────────────────────
+// Site Settings Tab
+// ─────────────────────────────────────────
+interface SiteSettingsTabProps {
+  onSaved?: () => void;
+}
+
+function SiteSettingsTab({ onSaved }: SiteSettingsTabProps) {
+  const [form, setForm] = useState<SiteSettings>({ ...DEFAULT_SITE_SETTINGS });
+  const [saving, setSaving] = useState(false);
+  const logoFileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setForm(getSiteSettings());
+  }, []);
+
+  const handleLogoUpload = (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const file = files[0];
+    if (!file.type.startsWith("image/")) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      setForm((prev) => ({ ...prev, logoImageUrl: reader.result as string }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const updateNavLink = (i: number, field: "label" | "href", value: string) => {
+    const updated = [...form.headerNavLinks];
+    updated[i] = { ...updated[i], [field]: value };
+    setForm({ ...form, headerNavLinks: updated });
+  };
+
+  const addNavLink = () => {
+    setForm({
+      ...form,
+      headerNavLinks: [
+        ...form.headerNavLinks,
+        { label: "New Link", href: "#section" },
+      ],
+    });
+  };
+
+  const removeNavLink = (i: number) => {
+    setForm({
+      ...form,
+      headerNavLinks: form.headerNavLinks.filter((_, idx) => idx !== i),
+    });
+  };
+
+  const handleSave = () => {
+    setSaving(true);
+    try {
+      saveSiteSettings(form);
+      toast.success("Site settings saved!");
+      onSaved?.();
+    } catch {
+      toast.error("Failed to save site settings");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="font-display text-xl font-bold">Site Settings</h2>
+          <p className="text-sm text-muted-foreground">
+            Logo, name, header, footer and advanced settings
+          </p>
+        </div>
+      </div>
+
+      <div className="space-y-5">
+        {/* Identity */}
+        <div className="glass rounded-2xl p-6 space-y-5">
+          <h3 className="font-semibold text-sm flex items-center gap-2">
+            <Globe className="w-3.5 h-3.5 text-primary" />
+            Site Identity
+          </h3>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label>Site Name</Label>
+              <Input
+                value={form.siteName}
+                onChange={(e) => setForm({ ...form, siteName: e.target.value })}
+                placeholder="Ganesh Raikwar"
+                className="bg-input/50"
+                data-ocid="site.name.input"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Site Tagline</Label>
+              <Input
+                value={form.siteTagline}
+                onChange={(e) =>
+                  setForm({ ...form, siteTagline: e.target.value })
+                }
+                placeholder="Full-Stack Developer"
+                className="bg-input/50"
+                data-ocid="site.tagline.input"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Logo */}
+        <div className="glass rounded-2xl p-6 space-y-5">
+          <h3 className="font-semibold text-sm flex items-center gap-2">
+            <FileImage className="w-3.5 h-3.5 text-primary" />
+            Logo
+          </h3>
+
+          <div className="flex items-start gap-4">
+            {/* Logo preview */}
+            <div
+              className="w-16 h-16 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden"
+              style={{
+                background: form.logoImageUrl
+                  ? undefined
+                  : "linear-gradient(135deg, oklch(0.75 0.24 22), oklch(0.55 0.28 10))",
+              }}
+            >
+              {form.logoImageUrl ? (
+                <img
+                  src={form.logoImageUrl}
+                  alt="Logo"
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span className="font-display font-bold text-lg text-white">
+                  {form.logoText?.slice(0, 2) || "GR"}
+                </span>
+              )}
+            </div>
+
+            <div className="flex-1 space-y-3">
+              <div className="space-y-1.5">
+                <Label>Logo Text (initials)</Label>
+                <Input
+                  value={form.logoText}
+                  onChange={(e) =>
+                    setForm({ ...form, logoText: e.target.value })
+                  }
+                  placeholder="GR"
+                  className="bg-input/50"
+                  maxLength={3}
+                  data-ocid="site.logo-text.input"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Shown if no logo image uploaded. Max 3 characters.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                <input
+                  ref={logoFileRef}
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  onChange={(e) => handleLogoUpload(e.target.files)}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => logoFileRef.current?.click()}
+                  className="border-border/50 gap-1.5 text-xs"
+                  data-ocid="site.logo.upload_button"
+                >
+                  <ImagePlus className="w-3.5 h-3.5" />
+                  Upload Logo Image
+                </Button>
+                {form.logoImageUrl && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setForm({ ...form, logoImageUrl: "" })}
+                    className="text-destructive hover:bg-destructive/10 text-xs gap-1"
+                    data-ocid="site.logo.delete_button"
+                  >
+                    <X className="w-3 h-3" />
+                    Remove Image
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Header Settings */}
+        <div className="glass rounded-2xl p-6 space-y-5">
+          <h3 className="font-semibold text-sm flex items-center gap-2">
+            <Link2 className="w-3.5 h-3.5 text-primary" />
+            Header & Navigation
+          </h3>
+
+          <div className="flex items-center justify-between py-1">
+            <div>
+              <Label className="text-sm font-medium">Sticky Header</Label>
+              <p className="text-xs text-muted-foreground">
+                Header stays visible when scrolling
+              </p>
+            </div>
+            <Switch
+              checked={form.headerSticky}
+              onCheckedChange={(v) => setForm({ ...form, headerSticky: v })}
+              data-ocid="site.header-sticky.switch"
+            />
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm">Nav Links</Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={addNavLink}
+                className="h-7 text-xs border-primary/30 text-primary hover:bg-primary/10 gap-1"
+                data-ocid="site.nav.add_button"
+              >
+                <Plus className="w-3 h-3" />
+                Add Link
+              </Button>
+            </div>
+            <div className="space-y-2">
+              {form.headerNavLinks.map((link, i) => (
+                <div
+                  // biome-ignore lint/suspicious/noArrayIndexKey: positional nav links
+                  key={i}
+                  className="flex items-center gap-2"
+                  data-ocid={`site.nav.item.${i + 1}`}
+                >
+                  <Input
+                    value={link.label}
+                    onChange={(e) => updateNavLink(i, "label", e.target.value)}
+                    placeholder="Label"
+                    className="bg-input/50 text-sm h-8 flex-1"
+                    data-ocid={`site.nav.label.${i + 1}`}
+                  />
+                  <Input
+                    value={link.href}
+                    onChange={(e) => updateNavLink(i, "href", e.target.value)}
+                    placeholder="#section or /page"
+                    className="bg-input/50 text-sm h-8 flex-1"
+                    data-ocid={`site.nav.href.${i + 1}`}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive flex-shrink-0"
+                    onClick={() => removeNavLink(i)}
+                    data-ocid={`site.nav.delete_button.${i + 1}`}
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Footer Settings */}
+        <div className="glass rounded-2xl p-6 space-y-5">
+          <h3 className="font-semibold text-sm flex items-center gap-2">
+            <Type className="w-3.5 h-3.5 text-primary" />
+            Footer
+          </h3>
+
+          <div className="space-y-1.5">
+            <Label>Footer Logo Text</Label>
+            <Input
+              value={form.footerLogoText}
+              onChange={(e) =>
+                setForm({ ...form, footerLogoText: e.target.value })
+              }
+              placeholder="GR"
+              className="bg-input/50"
+              data-ocid="site.footer-logo.input"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Footer Tagline</Label>
+            <Input
+              value={form.footerText}
+              onChange={(e) => setForm({ ...form, footerText: e.target.value })}
+              placeholder="Built with passion and creativity."
+              className="bg-input/50"
+              data-ocid="site.footer-text.input"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Copyright Text</Label>
+            <Input
+              value={form.footerCopyright}
+              onChange={(e) =>
+                setForm({ ...form, footerCopyright: e.target.value })
+              }
+              placeholder="© 2026 Ganesh Raikwar. All rights reserved."
+              className="bg-input/50"
+              data-ocid="site.footer-copyright.input"
+            />
+            <p className="text-xs text-muted-foreground">
+              Leave empty to auto-generate with current year.
+            </p>
+          </div>
+
+          <div className="flex items-center justify-between py-1">
+            <div>
+              <Label className="text-sm font-medium">
+                Show Social Icons in Footer
+              </Label>
+            </div>
+            <Switch
+              checked={form.footerShowSocial}
+              onCheckedChange={(v) => setForm({ ...form, footerShowSocial: v })}
+              data-ocid="site.footer-social.switch"
+            />
+          </div>
+        </div>
+
+        {/* Advanced Effects */}
+        <div className="glass rounded-2xl p-6 space-y-4">
+          <h3 className="font-semibold text-sm flex items-center gap-2">
+            <Sparkles className="w-3.5 h-3.5 text-primary" />
+            Advanced Effects
+          </h3>
+
+          {[
+            {
+              key: "animatedIcons" as const,
+              label: "Animated Icons",
+              desc: "Icons pulse and glow with animation",
+            },
+            {
+              key: "cursorGlow" as const,
+              label: "Cursor Glow Effect",
+              desc: "Mouse cursor leaves a glowing trail",
+            },
+            {
+              key: "particleBackground" as const,
+              label: "Particle Background",
+              desc: "Floating particles in the background",
+            },
+          ].map(({ key, label, desc }) => (
+            <div key={key} className="flex items-center justify-between py-1">
+              <div>
+                <Label className="text-sm font-medium">{label}</Label>
+                <p className="text-xs text-muted-foreground">{desc}</p>
+              </div>
+              <Switch
+                checked={form[key] as boolean}
+                onCheckedChange={(v) => setForm({ ...form, [key]: v })}
+                data-ocid={`site.${key}.switch`}
+              />
+            </div>
+          ))}
+        </div>
+
+        <div className="flex justify-end pt-2">
+          <Button
+            onClick={handleSave}
+            disabled={saving}
+            className="bg-primary text-primary-foreground hover:shadow-glow px-6"
+            data-ocid="admin.site.save_button"
+          >
+            {saving ? <Loader2 className="mr-2 w-4 h-4 animate-spin" /> : null}
+            {saving ? "Saving..." : "Save Site Settings"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────
 // Inline Preview Pane (desktop sidebar)
 // ─────────────────────────────────────────
 interface InlinePreviewPaneProps {
@@ -2836,6 +3566,14 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                     <Code2 className="w-4 h-4" />
                     Skills
                   </TabsTrigger>
+                  <TabsTrigger
+                    value="site"
+                    className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary rounded-md px-4 py-2.5 text-sm font-medium gap-2 whitespace-nowrap"
+                    data-ocid="admin.site.tab"
+                  >
+                    <Settings className="w-4 h-4" />
+                    Site
+                  </TabsTrigger>
                 </TabsList>
               </div>
 
@@ -2871,6 +3609,9 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                 className="focus-visible:outline-none"
               >
                 <SkillsTab onSaved={handleSaved} />
+              </TabsContent>
+              <TabsContent value="site" className="focus-visible:outline-none">
+                <SiteSettingsTab onSaved={handleSaved} />
               </TabsContent>
             </Tabs>
           </div>

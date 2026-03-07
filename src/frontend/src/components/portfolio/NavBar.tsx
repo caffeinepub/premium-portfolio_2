@@ -2,18 +2,26 @@ import { Link } from "@tanstack/react-router";
 import { Menu, X, Zap } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
-
-const NAV_LINKS = [
-  { label: "Work", href: "#featured" },
-  { label: "Projects", href: "#projects" },
-  { label: "Skills", href: "#skills" },
-  { label: "Reviews", href: "#reviews" },
-  { label: "Contact", href: "#contact" },
-];
+import { getSiteSettings } from "../../lib/localDataStore";
 
 export default function NavBar() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const siteSettings = getSiteSettings();
+
+  const navLinks =
+    siteSettings.headerNavLinks.length > 0
+      ? siteSettings.headerNavLinks
+      : [
+          { label: "Work", href: "#featured" },
+          { label: "Projects", href: "#projects" },
+          { label: "Skills", href: "#skills" },
+          { label: "Reviews", href: "#reviews" },
+          { label: "Contact", href: "#contact" },
+        ];
+
+  const logoText = siteSettings.logoText || "GR";
+  const siteName = siteSettings.siteName || "Portfolio";
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
@@ -23,9 +31,13 @@ export default function NavBar() {
 
   const scrollToSection = (href: string) => {
     setMobileOpen(false);
-    const id = href.replace("#", "");
-    const el = document.getElementById(id);
-    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (href.startsWith("#")) {
+      const id = href.replace("#", "");
+      const el = document.getElementById(id);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    } else {
+      window.location.href = href;
+    }
   };
 
   return (
@@ -50,41 +62,56 @@ export default function NavBar() {
             data-ocid="nav.home_link"
             className="flex items-center gap-2 group"
           >
-            <motion.div
-              className="w-8 h-8 rounded-lg flex items-center justify-center"
-              style={{
-                background:
-                  "linear-gradient(135deg, oklch(0.75 0.24 22), oklch(0.55 0.28 10))",
-              }}
-              whileHover={{
-                boxShadow:
-                  "0 0 16px oklch(0.65 0.26 20 / 0.6), 0 0 32px oklch(0.65 0.26 20 / 0.3)",
-                scale: 1.1,
-              }}
-              transition={{ duration: 0.2 }}
-            >
-              <Zap className="w-4 h-4 text-white" fill="white" />
-            </motion.div>
+            {siteSettings.logoImageUrl ? (
+              <motion.img
+                src={siteSettings.logoImageUrl}
+                alt={siteName}
+                className="w-8 h-8 rounded-lg object-cover"
+                whileHover={{ scale: 1.1 }}
+                transition={{ duration: 0.2 }}
+              />
+            ) : (
+              <motion.div
+                className="w-8 h-8 rounded-lg flex items-center justify-center font-display font-bold text-sm text-white"
+                style={{
+                  background:
+                    "linear-gradient(135deg, oklch(0.75 0.24 22), oklch(0.55 0.28 10))",
+                }}
+                whileHover={{
+                  boxShadow:
+                    "0 0 16px oklch(0.65 0.26 20 / 0.6), 0 0 32px oklch(0.65 0.26 20 / 0.3)",
+                  scale: 1.1,
+                }}
+                transition={{ duration: 0.2 }}
+              >
+                {logoText.length <= 2 ? (
+                  logoText
+                ) : (
+                  <Zap className="w-4 h-4 text-white" fill="white" />
+                )}
+              </motion.div>
+            )}
             <span className="font-display font-bold text-lg gradient-text">
-              Portfolio
+              {siteName}
             </span>
           </Link>
 
           {/* Desktop links */}
           <div className="hidden md:flex items-center gap-1">
-            {NAV_LINKS.map((link, i) => (
+            {navLinks.map((link, i) => (
               <motion.button
                 type="button"
-                key={link.href}
+                key={link.href + link.label}
                 onClick={() => scrollToSection(link.href)}
                 className="relative px-4 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground transition-colors duration-200 group"
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 + i * 0.05 }}
                 whileHover={{ color: "oklch(0.9 0.01 20)" }}
+                data-ocid="nav.link"
               >
                 {link.label}
-                {/* Red neon underline on hover */}
+                {/* Neon underline on hover */}
                 <motion.span
                   className="absolute bottom-0 left-1/2 -translate-x-1/2 h-0.5 rounded-full"
                   style={{
@@ -99,15 +126,15 @@ export default function NavBar() {
             ))}
           </div>
 
-          {/* Mobile menu button area */}
+          {/* Mobile menu button */}
           <div className="flex items-center gap-3">
-            {/* Mobile menu button */}
             <motion.button
               type="button"
               className="md:hidden p-2 rounded-lg hover:bg-white/5 transition-colors"
               onClick={() => setMobileOpen(!mobileOpen)}
               aria-label="Toggle menu"
               whileTap={{ scale: 0.9 }}
+              data-ocid="nav.mobile.toggle"
             >
               {mobileOpen ? (
                 <X className="w-5 h-5" />
@@ -131,15 +158,16 @@ export default function NavBar() {
             style={{ borderBottom: "1px solid oklch(0.65 0.26 20 / 0.2)" }}
           >
             <div className="container mx-auto px-6 py-4 flex flex-col gap-1">
-              {NAV_LINKS.map((link, i) => (
+              {navLinks.map((link, i) => (
                 <motion.button
                   type="button"
-                  key={link.href}
+                  key={link.href + link.label}
                   onClick={() => scrollToSection(link.href)}
                   className="text-left px-4 py-3 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all"
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: i * 0.05 }}
+                  data-ocid="nav.mobile.link"
                 >
                   {link.label}
                 </motion.button>

@@ -1,44 +1,56 @@
 # Premium Portfolio
 
 ## Current State
-- Portfolio site with hero, featured carousel, projects, skills, reviews, contact sections
-- NavBar has public "Admin" link visible to everyone (desktop and mobile menu)
-- Admin panel at `/admin` -- login calls backend `verifyAdminPassword()` which causes "Connection error"
-- Admin has 3 tabs: Projects, Reviews, Contact Info -- all working via localStorage
-- No design customization controls exist
-- No live preview in admin
+
+- Portfolio page shows projects with only the primary (first) image -- no image slider/carousel when multiple images are uploaded
+- `FeaturedCarousel.tsx` and `ProjectsSection.tsx` use `useProjectImage` hook which only loads the primary `idb:` image reference stored in `project.imageUrl`
+- `ProjectExtras` has `imageIds: string[]` storing all image IDs in IndexedDB, but neither `FeaturedCarousel` nor `ProjectsSection` uses those additional images
+- Admin Panel (Projects tab) only shows and manages projects stored in `localStorage` (`getLocalProjects()`). Default/backend/sample projects (from `sampleData.ts`) are NOT shown in admin -- user cannot edit or delete them
+- `PortfolioPage.tsx` merges localStorage projects with backend/sample projects for display, but admin panel never seeds/imports sample projects so they can't be managed
 
 ## Requested Changes (Diff)
 
 ### Add
-- Design Settings tab in Admin panel with:
-  - Primary accent color picker (red shades + custom)
-  - Background color options (pure black, dark gray, deep red-black)
-  - Font family picker for headings and body (5+ options)
-  - Animation toggle (enable/disable all animations site-wide)
-  - Section visibility toggles (show/hide Work, Projects, Skills, Reviews, Contact sections)
-  - Neon glow intensity slider (low/medium/high)
-- Live preview iframe panel inside Admin panel showing portfolio in real-time as settings change
-- Settings persisted to localStorage and applied on portfolio page load
-- Skills section editor in Admin panel -- add/edit/delete skills with icon picker
-- Hero section editor -- edit tagline, subtitle, availability badge text
-- localDataStore additions: `saveLocalDesignSettings`, `getLocalDesignSettings`, `saveLocalSkills`, `getLocalSkills`, `saveLocalHero`, `getLocalHero`
+- **Multi-image slider on project cards**: When a project has multiple images (imageIds.length > 1), show image navigation arrows and dot indicators on hover. Clicking through images shows each in the card's image area with a smooth fade/slide transition
+- **Image slider in FeaturedCarousel cards**: Center card (and side cards) should cycle through all project images, not just the primary one
+- **Image slider in ProjectsSection cards**: Each project card should show a mini image slider with left/right arrow buttons (appear on hover) and dot indicators for multiple images
+- **"Import Default Projects" button** in admin Projects tab: On first load, if localStorage has no projects, automatically offer to import sample projects. Also add a button "Load Default Projects" that imports sampleProjects into localStorage so they can be edited/deleted via admin panel
+- A new hook `useProjectImages` (plural) that loads ALL images for a project given imageIds array from ProjectExtras
 
 ### Modify
-- Admin login: replace `client.verifyAdminPassword(password)` backend call with a pure localStorage/hardcoded password check (password: "portfolio2024") -- no backend call, no "Connection error"
-- NavBar: remove the desktop "Admin" button link and the mobile "Admin Panel" link entirely -- admin only accessible via direct URL `/admin`
+- `FeaturedCarousel.tsx` -- `ProjectCard` component: Add internal image slider state. Load all images via imageIds from ProjectExtras. Show previous/next arrows on hover, dot indicators. Animate between images with fade transition
+- `ProjectsSection.tsx` -- `ProjectCard` component: Same multi-image slider treatment. Small arrows appear on card hover for image navigation
+- `AdminPage.tsx` -- `ProjectsTab`: When localStorage has 0 projects, show an "Import Default Projects" button (in addition to "Add Project"). This imports sampleProjects into localStorage so they appear in admin and can be managed. Also show count of default vs custom projects
+- `PortfolioPage.tsx` -- After import, projects should update in real time
 
 ### Remove
-- Backend `verifyAdminPassword` call from admin login flow
+- Nothing removed
 
 ## Implementation Plan
-1. Fix AdminLogin component: replace async backend call with synchronous password check against hardcoded "portfolio2024"
-2. Remove Admin link from NavBar desktop and mobile sections
-3. Add `saveLocalDesignSettings`, `getLocalDesignSettings`, `saveLocalSkills`, `getLocalSkills`, `saveLocalHero`, `getLocalHero` to localDataStore.ts
-4. Create DesignSettingsTab component inside AdminPage.tsx with color, font, animation, section visibility, glow intensity controls
-5. Create SkillsTab component in AdminPage.tsx for managing skills list
-6. Create HeroTab component in AdminPage.tsx for editing hero text
-7. Add live preview iframe panel (split-view or tab) in Admin dashboard that renders `/?preview=1` and refreshes on any settings change
-8. Apply design settings on PortfolioPage and NavBar via CSS variables or Tailwind classes from localStorage on page load
-9. Apply section visibility settings on PortfolioPage to show/hide sections
-10. Apply hero edits on HeroSection from localStorage
+
+1. **Add `useProjectImages` hook** in `src/frontend/src/hooks/useProjectImages.ts`:
+   - Accepts `imageIds: string[]` and `primaryImageUrl: string`, `fallback: string`
+   - Returns `{ images: string[], isLoading: boolean, primaryIndex: number }`
+   - Loads all images from IndexedDB using `loadImages(imageIds)`
+   - Falls back to primaryImageUrl if imageIds empty
+
+2. **Update `FeaturedCarousel.tsx` -- `ProjectCard`**:
+   - Import `useProjectImages` hook
+   - Add `imageIndex` state (0-indexed)
+   - Load all project images using `getProjectExtra(project.id).imageIds`
+   - Show image navigation: left/right arrows appear on hover, dot indicators at bottom of image area
+   - Smooth fade transition between images
+   - Auto-stop image cycling when project carousel is navigating
+
+3. **Update `ProjectsSection.tsx` -- `ProjectCard`**:
+   - Same multi-image slider treatment
+   - Compact arrows (small, semi-transparent) appear on card hover
+   - Dot indicators at bottom overlay
+
+4. **Update `AdminPage.tsx` -- `ProjectsTab`**:
+   - Import `sampleProjects` from `../data/sampleData`
+   - Add `handleImportDefaults()` function: calls `addLocalProject` for each sample project, then calls `upsertProjectExtra` with empty extras
+   - Show "Import Default Projects" button in empty state AND as a secondary button in the header when projects exist
+   - After import, refresh project list
+
+5. **Validate** with typecheck and build

@@ -216,6 +216,7 @@ export function clearLocalContact(): void {
 
 export interface DesignSettings {
   primaryColorHue: number; // 0-360, default 20 (red)
+  primaryColorChroma: number; // 0-0.37, default 0.26
   glowIntensity: "low" | "medium" | "high"; // default 'medium'
   fontHeading: string; // CSS font-family, default 'Inter'
   fontBody: string; // CSS font-family, default 'Inter'
@@ -227,13 +228,33 @@ export interface DesignSettings {
     reviews: boolean;
     contact: boolean;
   };
-  bgStyle: "pure-black" | "dark-gray" | "deep-red"; // default 'pure-black'
+  bgStyle:
+    | "pure-black"
+    | "dark-gray"
+    | "deep-red"
+    | "deep-blue"
+    | "deep-purple"
+    | "midnight"; // default 'pure-black'
+  themePreset:
+    | "custom"
+    | "neon-red"
+    | "neon-blue"
+    | "neon-green"
+    | "neon-purple"
+    | "neon-gold"
+    | "neon-pink"
+    | "cyber-teal"
+    | "solar-orange";
+  cardStyle: "glass" | "solid" | "minimal" | "bordered";
+  buttonStyle: "rounded" | "pill" | "sharp";
+  layoutDensity: "compact" | "normal" | "spacious";
 }
 
 const DESIGN_KEY = "portfolio_design";
 
 export const DEFAULT_DESIGN_SETTINGS: DesignSettings = {
   primaryColorHue: 20,
+  primaryColorChroma: 0.26,
   glowIntensity: "medium",
   fontHeading: "Inter",
   fontBody: "Inter",
@@ -246,13 +267,25 @@ export const DEFAULT_DESIGN_SETTINGS: DesignSettings = {
     contact: true,
   },
   bgStyle: "pure-black",
+  themePreset: "neon-red",
+  cardStyle: "glass",
+  buttonStyle: "rounded",
+  layoutDensity: "normal",
 };
 
 export function getLocalDesignSettings(): DesignSettings {
   try {
     const raw = localStorage.getItem(DESIGN_KEY);
     if (!raw) return { ...DEFAULT_DESIGN_SETTINGS };
-    return { ...DEFAULT_DESIGN_SETTINGS, ...JSON.parse(raw) };
+    const parsed = JSON.parse(raw) as Partial<DesignSettings>;
+    return {
+      ...DEFAULT_DESIGN_SETTINGS,
+      ...parsed,
+      sections: {
+        ...DEFAULT_DESIGN_SETTINGS.sections,
+        ...(parsed.sections ?? {}),
+      },
+    };
   } catch {
     return { ...DEFAULT_DESIGN_SETTINGS };
   }
@@ -410,4 +443,72 @@ export function upsertProjectExtra(extra: ProjectExtras): void {
     all.push(extra);
   }
   saveProjectExtras(all);
+}
+
+// ─── Site Settings ────────────────────────────────────────────
+
+export interface SiteSettings {
+  siteName: string;
+  siteTagline: string;
+  logoText: string;
+  logoImageUrl: string; // base64 or URL for custom logo image
+  faviconUrl: string;
+  // Header settings
+  headerSticky: boolean;
+  headerNavLinks: Array<{ label: string; href: string }>;
+  // Footer settings
+  footerText: string;
+  footerShowSocial: boolean;
+  footerCopyright: string;
+  footerLogoText: string;
+  // Advanced
+  animatedIcons: boolean;
+  cursorGlow: boolean;
+  particleBackground: boolean;
+  // About section
+  aboutImageUrl: string;
+  aboutHeading: string;
+  aboutBody: string;
+}
+
+const SITE_SETTINGS_KEY = "portfolio_site_settings";
+
+export const DEFAULT_SITE_SETTINGS: SiteSettings = {
+  siteName: "Ganesh Raikwar",
+  siteTagline: "Full-Stack Developer & Creative Technologist",
+  logoText: "GR",
+  logoImageUrl: "",
+  faviconUrl: "",
+  headerSticky: true,
+  headerNavLinks: [
+    { label: "Work", href: "#featured" },
+    { label: "Projects", href: "#projects" },
+    { label: "Skills", href: "#skills" },
+    { label: "Reviews", href: "#reviews" },
+    { label: "Contact", href: "#contact" },
+  ],
+  footerText: "Built with passion and creativity.",
+  footerShowSocial: true,
+  footerCopyright: "",
+  footerLogoText: "GR",
+  animatedIcons: true,
+  cursorGlow: false,
+  particleBackground: false,
+  aboutImageUrl: "",
+  aboutHeading: "About Me",
+  aboutBody: "",
+};
+
+export function getSiteSettings(): SiteSettings {
+  try {
+    const raw = localStorage.getItem(SITE_SETTINGS_KEY);
+    if (!raw) return { ...DEFAULT_SITE_SETTINGS };
+    return { ...DEFAULT_SITE_SETTINGS, ...JSON.parse(raw) };
+  } catch {
+    return { ...DEFAULT_SITE_SETTINGS };
+  }
+}
+
+export function saveSiteSettings(settings: SiteSettings): void {
+  localStorage.setItem(SITE_SETTINGS_KEY, JSON.stringify(settings));
 }

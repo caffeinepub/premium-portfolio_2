@@ -19,6 +19,7 @@ import {
   getLocalDesignSettings,
   getLocalProjects,
   getLocalReviews,
+  getSiteSettings,
   getSocialSettings,
 } from "../lib/localDataStore";
 
@@ -116,6 +117,7 @@ export default function PortfolioPage() {
   const hostname =
     typeof window !== "undefined" ? window.location.hostname : "";
   const designSettings = getLocalDesignSettings();
+  const siteSettings = getSiteSettings();
 
   return (
     <div className="min-h-screen bg-background">
@@ -157,9 +159,22 @@ export default function PortfolioPage() {
 
       <footer className="border-t border-border/30 py-8">
         <div className="container mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-sm text-muted-foreground">
-            © {currentYear} {contact?.name || "Portfolio"}. All rights reserved.
-          </p>
+          <div className="flex flex-col items-center sm:items-start gap-1">
+            {siteSettings.footerLogoText && (
+              <span className="font-display font-bold text-sm gradient-text">
+                {siteSettings.footerLogoText}
+              </span>
+            )}
+            <p className="text-sm text-muted-foreground">
+              {siteSettings.footerCopyright ||
+                `© ${currentYear} ${contact?.name || siteSettings.siteName || "Portfolio"}. All rights reserved.`}
+            </p>
+            {siteSettings.footerText && (
+              <p className="text-xs text-muted-foreground/60">
+                {siteSettings.footerText}
+              </p>
+            )}
+          </div>
           <a
             href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(hostname)}`}
             target="_blank"

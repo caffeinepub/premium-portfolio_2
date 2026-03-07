@@ -1,8 +1,14 @@
-import { ExternalLink, FolderOpen } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  ExternalLink,
+  FolderOpen,
+} from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import type { Project } from "../../backend";
-import { useProjectImage } from "../../hooks/useProjectImage";
+import { useProjectImages } from "../../hooks/useProjectImages";
+import { getProjectExtra } from "../../lib/localDataStore";
 
 const CATEGORIES = ["All", "Web Dev", "Design", "AI", "Editing"] as const;
 
@@ -37,10 +43,28 @@ function ProjectCard({ project, index }: { project: Project; index: number }) {
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
   const [visible, setVisible] = useState(false);
   const [hovered, setHovered] = useState(false);
-  const resolvedImage = useProjectImage(
+
+  const extras = getProjectExtra(project.id.toString());
+
+  // Load ALL images for this project
+  const { images } = useProjectImages(
+    extras?.imageIds,
     project.imageUrl,
     "/assets/generated/project-ecommerce.dim_800x500.jpg",
   );
+
+  // Internal image slider state
+  const [imgIndex, setImgIndex] = useState(0);
+  const [imgDir, setImgDir] = useState(0);
+
+  const totalImages = images.length;
+  const hasMultiple = totalImages > 1;
+
+  // Reset image index when project changes
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally reset on project id change
+  useEffect(() => {
+    setImgIndex(0);
+  }, [project.id]);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -61,6 +85,23 @@ function ProjectCard({ project, index }: { project: Project; index: number }) {
     const y = ((e.clientX - rect.left - rect.width / 2) / (rect.width / 2)) * 6;
     setTilt({ x, y });
   };
+
+  const goImgPrev = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setImgDir(-1);
+    setImgIndex((prev) => (prev - 1 + totalImages) % totalImages);
+  };
+
+  const goImgNext = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setImgDir(1);
+    setImgIndex((prev) => (prev + 1) % totalImages);
+  };
+
+  const currentImage =
+    images[imgIndex] || "/assets/generated/project-ecommerce.dim_800x500.jpg";
 
   const colors =
     CATEGORY_COLORS[project.category] || CATEGORY_COLORS["Web Dev"];
@@ -89,16 +130,25 @@ function ProjectCard({ project, index }: { project: Project; index: number }) {
             : "0 8px 32px oklch(0 0 0 / 0.4)",
         }}
       >
-        {/* Image */}
+        {/* Image area with slider */}
         <div className="relative h-48 overflow-hidden flex-shrink-0">
-          <img
-            src={resolvedImage}
-            alt={project.title}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-          />
+          <AnimatePresence mode="popLayout" custom={imgDir}>
+            <motion.img
+              key={`${project.id}-img-${imgIndex}`}
+              src={currentImage}
+              alt={`${project.title} ${imgIndex + 1}`}
+              className="w-full h-full object-cover absolute inset-0 transition-transform duration-500 group-hover:scale-105"
+              initial={{ opacity: 0, x: imgDir * 30 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: imgDir * -30 }}
+              transition={{ duration: 0.3, ease: "easeInOut" }}
+            />
+          </AnimatePresence>
+
           <div className="absolute inset-0 bg-gradient-to-t from-card/90 via-card/10 to-transparent" />
 
-          <div className="absolute top-3 left-3">
+          {/* Category badge */}
+          <div className="absolute top-3 left-3 z-10">
             <span
               className="px-2.5 py-1 rounded-full text-xs font-medium border"
               style={{
@@ -110,6 +160,81 @@ function ProjectCard({ project, index }: { project: Project; index: number }) {
               {project.category}
             </span>
           </div>
+
+          {/* Image navigation arrows (appear on hover when multiple images) */}
+          {hasMultiple && hovered && (
+            <>
+              <button
+                type="button"
+                onClick={goImgPrev}
+                className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-6 h-6 rounded-full flex items-center justify-center"
+                style={{
+                  background: "oklch(0 0 0 / 0.6)",
+                  border: "1px solid oklch(1 0 0 / 0.15)",
+                  color: "white",
+                }}
+                aria-label="Previous image"
+                data-ocid="projects.img.pagination_prev"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={goImgNext}
+                className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-6 h-6 rounded-full flex items-center justify-center"
+                style={{
+                  background: "oklch(0 0 0 / 0.6)",
+                  border: "1px solid oklch(1 0 0 / 0.15)",
+                  color: "white",
+                }}
+                aria-label="Next image"
+                data-ocid="projects.img.pagination_next"
+              >
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </>
+          )}
+
+          {/* Image dots indicator (bottom overlay) */}
+          {hasMultiple && (
+            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1">
+              {images.map((_, i) => (
+                <button
+                  // biome-ignore lint/suspicious/noArrayIndexKey: positional dots
+                  key={i}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setImgDir(i > imgIndex ? 1 : -1);
+                    setImgIndex(i);
+                  }}
+                  className="rounded-full transition-all duration-200"
+                  style={{
+                    width: i === imgIndex ? "14px" : "4px",
+                    height: "4px",
+                    background:
+                      i === imgIndex
+                        ? "oklch(0.65 0.26 20)"
+                        : "oklch(1 0 0 / 0.5)",
+                  }}
+                  aria-label={`Image ${i + 1}`}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Image count (when multiple, not hovered) */}
+          {hasMultiple && !hovered && (
+            <div
+              className="absolute bottom-2 right-2 z-10 text-[9px] px-1.5 py-0.5 rounded font-medium"
+              style={{
+                background: "oklch(0 0 0 / 0.6)",
+                color: "oklch(0.85 0 0)",
+              }}
+            >
+              {imgIndex + 1}/{totalImages}
+            </div>
+          )}
         </div>
 
         {/* Content */}
