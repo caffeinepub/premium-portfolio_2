@@ -30,14 +30,18 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Link } from "@tanstack/react-router";
 import {
+  AlertTriangle,
+  CheckCircle2,
   ChevronDown,
   ChevronUp,
+  Clock,
   Code2,
   Download,
   Eye,
   EyeOff,
   FileImage,
   Globe,
+  History,
   ImagePlus,
   Images,
   LayoutDashboard,
@@ -51,6 +55,7 @@ import {
   Plus,
   RefreshCw,
   Settings,
+  ShieldCheck,
   Sparkles,
   Star,
   Trash2,
@@ -102,26 +107,481 @@ import {
 } from "../lib/localDataStore";
 
 // ─────────────────────────────────────────
+// Auth Security Types & Helpers
+// ─────────────────────────────────────────
+
+const AUTH_STATE_KEY = "admin_auth_state";
+const SESSION_KEY = "admin_session_start";
+const MAX_ATTEMPTS = 5;
+const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 60 seconds
+const RATE_LIMIT_MAX = 3;
+const PIN_LOCKOUT_DURATION_MS = 5 * 60 * 1000; // 5 minutes
+const PIN_MAX_ATTEMPTS = 3;
+
+interface LoginHistoryEntry {
+  timestamp: number;
+  success: boolean;
+  note?: string;
+}
+
+interface AuthState {
+  attempts: number;
+  lockedUntil: number;
+  attemptTimestamps: number[];
+  loginHistory: LoginHistoryEntry[];
+  // PIN specific
+  pinAttempts: number;
+  pinLockedUntil: number;
+}
+
+function getAuthState(): AuthState {
+  try {
+    const raw = localStorage.getItem(AUTH_STATE_KEY);
+    if (!raw)
+      return {
+        attempts: 0,
+        lockedUntil: 0,
+        attemptTimestamps: [],
+        loginHistory: [],
+        pinAttempts: 0,
+        pinLockedUntil: 0,
+      };
+    return {
+      attempts: 0,
+      lockedUntil: 0,
+      attemptTimestamps: [],
+      loginHistory: [],
+      pinAttempts: 0,
+      pinLockedUntil: 0,
+      ...JSON.parse(raw),
+    };
+  } catch {
+    return {
+      attempts: 0,
+      lockedUntil: 0,
+      attemptTimestamps: [],
+      loginHistory: [],
+      pinAttempts: 0,
+      pinLockedUntil: 0,
+    };
+  }
+}
+
+function saveAuthState(state: AuthState): void {
+  localStorage.setItem(AUTH_STATE_KEY, JSON.stringify(state));
+}
+
+function addLoginHistory(
+  state: AuthState,
+  success: boolean,
+  note?: string,
+): AuthState {
+  const entry: LoginHistoryEntry = {
+    timestamp: Date.now(),
+    success,
+    note,
+  };
+  return {
+    ...state,
+    loginHistory: [entry, ...state.loginHistory].slice(0, 20),
+  };
+}
+
+// ─────────────────────────────────────────
+// PIN Step Component
+// ─────────────────────────────────────────
+function PinStep({
+  onSuccess,
+  onBack,
+}: { onSuccess: () => void; onBack: () => void }) {
+  const [pins, setPins] = useState(["", "", "", ""]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [locked, setLocked] = useState(false);
+  const [lockSecondsLeft, setLockSecondsLeft] = useState(0);
+  const inputRef0 = useRef<HTMLInputElement>(null);
+  const inputRef1 = useRef<HTMLInputElement>(null);
+  const inputRef2 = useRef<HTMLInputElement>(null);
+  const inputRef3 = useRef<HTMLInputElement>(null);
+  const inputRefs = [inputRef0, inputRef1, inputRef2, inputRef3];
+
+  useEffect(() => {
+    const state = getAuthState();
+    if (state.pinLockedUntil > Date.now()) {
+      setLocked(true);
+      const secs = Math.ceil((state.pinLockedUntil - Date.now()) / 1000);
+      setLockSecondsLeft(secs);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!locked) return;
+    const interval = setInterval(() => {
+      const state = getAuthState();
+      const remaining = Math.ceil((state.pinLockedUntil - Date.now()) / 1000);
+      if (remaining <= 0) {
+        setLocked(false);
+        setLockSecondsLeft(0);
+        // Reset pin attempts after lockout
+        const updated = {
+          ...state,
+          pinAttempts: 0,
+          pinLockedUntil: 0,
+        };
+        saveAuthState(updated);
+        clearInterval(interval);
+      } else {
+        setLockSecondsLeft(remaining);
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [locked]);
+
+  const handlePinChange = (idx: number, value: string) => {
+    const digit = value.replace(/\D/g, "").slice(-1);
+    const newPins = [...pins];
+    newPins[idx] = digit;
+    setPins(newPins);
+    if (digit && idx < 3) {
+      inputRefs[idx + 1].current?.focus();
+    }
+    // Auto-submit when 4 digits filled
+    if (idx === 3 && digit) {
+      const fullPin = [...newPins.slice(0, 3), digit].join("");
+      if (fullPin.length === 4) {
+        handleVerifyPin(fullPin);
+      }
+    }
+  };
+
+  const handleKeyDown = (idx: number, e: React.KeyboardEvent) => {
+    if (e.key === "Backspace" && !pins[idx] && idx > 0) {
+      inputRefs[idx - 1].current?.focus();
+    }
+  };
+
+  const handleVerifyPin = async (pinValue?: string) => {
+    const pin = pinValue ?? pins.join("");
+    if (pin.length < 4) return;
+    setLoading(true);
+    setError("");
+    await new Promise((r) => setTimeout(r, 300));
+
+    const storedPin = localStorage.getItem("admin_pin") || "2024";
+    const state = getAuthState();
+
+    if (pin === storedPin) {
+      const updated = addLoginHistory(
+        { ...state, pinAttempts: 0, pinLockedUntil: 0 },
+        true,
+        "Login successful",
+      );
+      saveAuthState(updated);
+      localStorage.setItem(SESSION_KEY, Date.now().toString());
+      onSuccess();
+    } else {
+      const newAttempts = state.pinAttempts + 1;
+      let updated: AuthState;
+      if (newAttempts >= PIN_MAX_ATTEMPTS) {
+        const lockUntil = Date.now() + PIN_LOCKOUT_DURATION_MS;
+        updated = addLoginHistory(
+          { ...state, pinAttempts: 0, pinLockedUntil: lockUntil },
+          false,
+          "Too many PIN attempts — locked",
+        );
+        saveAuthState(updated);
+        setLocked(true);
+        setLockSecondsLeft(Math.ceil(PIN_LOCKOUT_DURATION_MS / 1000));
+        setError("Too many wrong PINs. Locked for 5 minutes.");
+      } else {
+        updated = addLoginHistory(
+          { ...state, pinAttempts: newAttempts },
+          false,
+          "Wrong PIN",
+        );
+        saveAuthState(updated);
+        setError(
+          `Incorrect PIN. ${PIN_MAX_ATTEMPTS - newAttempts} attempt${PIN_MAX_ATTEMPTS - newAttempts === 1 ? "" : "s"} remaining.`,
+        );
+        setPins(["", "", "", ""]);
+        inputRefs[0].current?.focus();
+      }
+    }
+    setLoading(false);
+  };
+
+  const formatTime = (secs: number) => {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  };
+
+  return (
+    <div className="flex flex-col items-center">
+      <motion.div
+        className="w-16 h-16 rounded-2xl flex items-center justify-center mb-5"
+        style={{
+          background: "var(--theme-primary-dim)",
+          border: "1px solid var(--theme-primary-border)",
+        }}
+        animate={locked ? { scale: [1, 1.04, 1] } : { scale: 1 }}
+        transition={{
+          repeat: locked ? Number.POSITIVE_INFINITY : 0,
+          duration: 1.5,
+        }}
+      >
+        {locked ? (
+          <Lock className="w-7 h-7 text-primary" />
+        ) : (
+          <ShieldCheck className="w-7 h-7 text-primary" />
+        )}
+      </motion.div>
+
+      <h2 className="font-display text-2xl font-bold text-foreground mb-1">
+        Two-Step Verification
+      </h2>
+      <p className="text-sm text-muted-foreground mb-6 text-center">
+        {locked
+          ? `Access locked. Try again in ${formatTime(lockSecondsLeft)}`
+          : "Enter your 4-digit security PIN"}
+      </p>
+
+      {locked ? (
+        <div
+          className="w-full text-center py-4 px-6 rounded-xl text-sm font-medium"
+          style={{
+            background: "oklch(0.63 0.22 25 / 0.12)",
+            border: "1px solid oklch(0.63 0.22 25 / 0.3)",
+            color: "oklch(0.75 0.20 25)",
+          }}
+          data-ocid="admin.pin.error_state"
+        >
+          <Lock className="w-4 h-4 inline mr-2" />
+          Locked — {formatTime(lockSecondsLeft)} remaining
+        </div>
+      ) : (
+        <>
+          {/* PIN boxes */}
+          <div className="flex gap-3 mb-4">
+            {pins.map((pin, idx) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: positional PIN digits
+              <motion.div key={idx} whileTap={{ scale: 0.95 }}>
+                <input
+                  ref={inputRefs[idx]}
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={1}
+                  value={pin}
+                  onChange={(e) => handlePinChange(idx, e.target.value)}
+                  onKeyDown={(e) => handleKeyDown(idx, e)}
+                  className="w-14 h-16 text-center text-2xl font-bold rounded-2xl outline-none transition-all duration-200 bg-transparent"
+                  style={{
+                    border: pin
+                      ? "2px solid var(--theme-primary)"
+                      : "2px solid var(--theme-border-line)",
+                    color: "var(--theme-primary)",
+                    boxShadow: pin
+                      ? "0 0 16px var(--theme-primary-glow), inset 0 0 8px var(--theme-primary-dim)"
+                      : "none",
+                    caretColor: "var(--theme-primary)",
+                  }}
+                  data-ocid={`admin.pin.input.${idx + 1}`}
+                />
+              </motion.div>
+            ))}
+          </div>
+
+          <AnimatePresence>
+            {error && (
+              <motion.p
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                className="text-sm text-destructive mb-4 text-center"
+                data-ocid="admin.pin.error_state"
+              >
+                {error}
+              </motion.p>
+            )}
+          </AnimatePresence>
+
+          <Button
+            onClick={() => handleVerifyPin()}
+            disabled={loading || pins.join("").length < 4}
+            className="w-full py-5 font-semibold bg-primary text-primary-foreground hover:shadow-glow transition-all duration-200 mb-3"
+            data-ocid="admin.pin.submit_button"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 w-4 h-4 animate-spin" />
+                Verifying PIN...
+              </>
+            ) : (
+              <>
+                <ShieldCheck className="mr-2 w-4 h-4" />
+                Verify PIN
+              </>
+            )}
+          </Button>
+        </>
+      )}
+
+      <button
+        type="button"
+        onClick={onBack}
+        className="text-sm text-muted-foreground hover:text-primary transition-colors mt-1"
+        data-ocid="admin.pin.back_button"
+      >
+        ← Back to password
+      </button>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────
 // Auth gate
 // ─────────────────────────────────────────
 function AdminLogin({ onSuccess }: { onSuccess: () => void }) {
+  const [step, setStep] = useState<"password" | "pin">("password");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showPw, setShowPw] = useState(false);
+  const [locked, setLocked] = useState(false);
+  const [lockSecondsLeft, setLockSecondsLeft] = useState(0);
+  const [attemptsLeft, setAttemptsLeft] = useState<number | null>(null);
+  const [showEmergencyConfirm, setShowEmergencyConfirm] = useState(false);
+
+  // Check lock state on mount
+  useEffect(() => {
+    const state = getAuthState();
+    if (state.lockedUntil > Date.now()) {
+      setLocked(true);
+      const secs = Math.ceil((state.lockedUntil - Date.now()) / 1000);
+      setLockSecondsLeft(secs);
+    }
+    if (state.attempts > 0) {
+      setAttemptsLeft(MAX_ATTEMPTS - state.attempts);
+    }
+  }, []);
+
+  // Countdown timer for lockout
+  useEffect(() => {
+    if (!locked) return;
+    const interval = setInterval(() => {
+      const state = getAuthState();
+      const remaining = Math.ceil((state.lockedUntil - Date.now()) / 1000);
+      if (remaining <= 0) {
+        setLocked(false);
+        setLockSecondsLeft(0);
+        setAttemptsLeft(null);
+        const updated = {
+          ...state,
+          attempts: 0,
+          lockedUntil: 0,
+          attemptTimestamps: [],
+        };
+        saveAuthState(updated);
+        clearInterval(interval);
+      } else {
+        setLockSecondsLeft(remaining);
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [locked]);
+
+  const formatTime = (secs: number) => {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!password.trim()) return;
+    if (!password.trim() || locked) return;
+
+    const state = getAuthState();
+
+    // Rate limit: max RATE_LIMIT_MAX attempts in RATE_LIMIT_WINDOW_MS
+    const now = Date.now();
+    const recentAttempts = (state.attemptTimestamps ?? []).filter(
+      (ts) => now - ts < RATE_LIMIT_WINDOW_MS,
+    );
+    if (recentAttempts.length >= RATE_LIMIT_MAX) {
+      setError("Too many attempts. Please wait 60 seconds.");
+      return;
+    }
+
     setLoading(true);
     setError("");
-    await new Promise((resolve) => setTimeout(resolve, 400));
-    if (password === "portfolio2024") {
-      onSuccess();
+    await new Promise((resolve) => setTimeout(resolve, 450));
+
+    const storedPassword =
+      localStorage.getItem("admin_password") || "portfolio2024";
+
+    if (password === storedPassword) {
+      // Password correct → advance to PIN step
+      const updated = addLoginHistory(
+        { ...state, attempts: 0, lockedUntil: 0, attemptTimestamps: [] },
+        false, // not fully success yet, PIN step pending
+        "Password accepted — awaiting PIN",
+      );
+      saveAuthState(updated);
+      setAttemptsLeft(null);
+      setStep("pin");
     } else {
-      setError("Incorrect password. Please try again.");
+      const newTimestamps = [...(state.attemptTimestamps ?? []), now];
+      const newAttempts = state.attempts + 1;
+      let updated: AuthState;
+
+      if (newAttempts >= MAX_ATTEMPTS) {
+        const lockUntil = now + LOCKOUT_DURATION_MS;
+        updated = addLoginHistory(
+          {
+            ...state,
+            attempts: 0,
+            lockedUntil: lockUntil,
+            attemptTimestamps: [],
+          },
+          false,
+          "Account locked after 5 failed attempts",
+        );
+        saveAuthState(updated);
+        setLocked(true);
+        setLockSecondsLeft(Math.ceil(LOCKOUT_DURATION_MS / 1000));
+        setAttemptsLeft(0);
+        setError("Too many failed attempts. Access locked for 15 minutes.");
+      } else {
+        updated = addLoginHistory(
+          { ...state, attempts: newAttempts, attemptTimestamps: newTimestamps },
+          false,
+          "Wrong password",
+        );
+        saveAuthState(updated);
+        const remaining = MAX_ATTEMPTS - newAttempts;
+        setAttemptsLeft(remaining);
+        setError("Incorrect password.");
+      }
     }
     setLoading(false);
+  };
+
+  const handleEmergencyReset = () => {
+    saveAuthState({
+      attempts: 0,
+      lockedUntil: 0,
+      attemptTimestamps: [],
+      loginHistory: getAuthState().loginHistory,
+      pinAttempts: 0,
+      pinLockedUntil: 0,
+    });
+    setLocked(false);
+    setLockSecondsLeft(0);
+    setAttemptsLeft(null);
+    setError("");
+    setShowEmergencyConfirm(false);
+    setPassword("");
   };
 
   return (
@@ -138,7 +598,7 @@ function AdminLogin({ onSuccess }: { onSuccess: () => void }) {
             className="absolute -top-16 -right-16 w-48 h-48 rounded-full pointer-events-none"
             style={{
               background:
-                "radial-gradient(circle, oklch(0.65 0.26 20 / 0.12) 0%, transparent 70%)",
+                "radial-gradient(circle, var(--theme-primary-dim) 0%, transparent 70%)",
             }}
           />
 
@@ -148,7 +608,7 @@ function AdminLogin({ onSuccess }: { onSuccess: () => void }) {
               className="w-10 h-10 rounded-xl flex items-center justify-center"
               style={{
                 background:
-                  "linear-gradient(135deg, oklch(0.75 0.24 22), oklch(0.55 0.28 10))",
+                  "linear-gradient(135deg, var(--theme-primary), var(--theme-accent))",
               }}
             >
               <Zap className="w-5 h-5 text-white" fill="white" />
@@ -163,99 +623,224 @@ function AdminLogin({ onSuccess }: { onSuccess: () => void }) {
             </div>
           </div>
 
-          <div className="flex flex-col items-center mb-6">
-            <div
-              className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4 animate-pulse-glow"
-              style={{
-                background: "oklch(0.65 0.26 20 / 0.15)",
-                border: "1px solid oklch(0.65 0.26 20 / 0.3)",
-              }}
-            >
-              <Lock className="w-6 h-6 text-primary" />
-            </div>
-            <h2 className="font-display text-2xl font-bold text-foreground">
-              Enter Password
-            </h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              Access the admin dashboard
-            </p>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label
-                htmlFor="admin-password"
-                className="text-sm text-muted-foreground"
+          <AnimatePresence mode="wait">
+            {step === "password" ? (
+              <motion.div
+                key="pw-step"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.25 }}
               >
-                Admin Password
-              </Label>
-              <div className="relative">
-                <Input
-                  id="admin-password"
-                  type={showPw ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter password..."
-                  className="bg-input/50 border-border/50 pr-10 focus:border-primary/50 focus:ring-primary/20"
-                  data-ocid="admin.input"
-                  autoComplete="current-password"
-                />
-                <button
-                  type="button"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                  onClick={() => setShowPw(!showPw)}
-                  aria-label={showPw ? "Hide password" : "Show password"}
-                >
-                  {showPw ? (
-                    <EyeOff className="w-4 h-4" />
-                  ) : (
-                    <Eye className="w-4 h-4" />
-                  )}
-                </button>
-              </div>
-              <AnimatePresence>
-                {error && (
-                  <motion.p
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="text-sm text-destructive"
-                    data-ocid="admin.error_state"
+                <div className="flex flex-col items-center mb-6">
+                  <motion.div
+                    className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
+                    style={{
+                      background: locked
+                        ? "oklch(0.63 0.22 25 / 0.15)"
+                        : "var(--theme-primary-dim)",
+                      border: locked
+                        ? "1px solid oklch(0.63 0.22 25 / 0.3)"
+                        : "1px solid var(--theme-primary-border)",
+                    }}
+                    animate={locked ? { scale: [1, 1.04, 1] } : { scale: 1 }}
+                    transition={{
+                      repeat: locked ? Number.POSITIVE_INFINITY : 0,
+                      duration: 1.5,
+                    }}
                   >
-                    {error}
-                  </motion.p>
+                    <Lock
+                      className="w-6 h-6"
+                      style={{
+                        color: locked
+                          ? "oklch(0.75 0.20 25)"
+                          : "var(--theme-primary)",
+                      }}
+                    />
+                  </motion.div>
+                  <h2 className="font-display text-2xl font-bold text-foreground">
+                    {locked ? "Access Locked" : "Enter Password"}
+                  </h2>
+                  <p className="text-sm text-muted-foreground mt-1 text-center">
+                    {locked
+                      ? `Try again in ${formatTime(lockSecondsLeft)}`
+                      : "Step 1 of 2 — Password verification"}
+                  </p>
+                </div>
+
+                {locked ? (
+                  <div
+                    className="w-full text-center py-5 px-6 rounded-2xl text-sm font-medium mb-4"
+                    style={{
+                      background: "oklch(0.63 0.22 25 / 0.10)",
+                      border: "1px solid oklch(0.63 0.22 25 / 0.25)",
+                      color: "oklch(0.75 0.20 25)",
+                    }}
+                    data-ocid="admin.lockout.error_state"
+                  >
+                    <AlertTriangle className="w-5 h-5 inline mr-2 mb-0.5" />
+                    <span className="font-semibold">Locked</span> —{" "}
+                    {formatTime(lockSecondsLeft)} remaining
+                    <div className="text-xs mt-1 opacity-70">
+                      Too many failed attempts
+                    </div>
+                  </div>
+                ) : (
+                  <form onSubmit={handleSubmit} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor="admin-password"
+                        className="text-sm text-muted-foreground"
+                      >
+                        Admin Password
+                      </Label>
+                      <div className="relative">
+                        <Input
+                          id="admin-password"
+                          type={showPw ? "text" : "password"}
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          placeholder="Enter password..."
+                          className="bg-input/50 border-border/50 pr-10 focus:border-primary/50 focus:ring-primary/20"
+                          data-ocid="admin.input"
+                          autoComplete="current-password"
+                        />
+                        <button
+                          type="button"
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                          onClick={() => setShowPw(!showPw)}
+                          aria-label={
+                            showPw ? "Hide password" : "Show password"
+                          }
+                        >
+                          {showPw ? (
+                            <EyeOff className="w-4 h-4" />
+                          ) : (
+                            <Eye className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
+
+                      <AnimatePresence>
+                        {error && (
+                          <motion.p
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="text-sm text-destructive"
+                            data-ocid="admin.error_state"
+                          >
+                            {error}
+                          </motion.p>
+                        )}
+                      </AnimatePresence>
+
+                      {attemptsLeft !== null && attemptsLeft > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          <AlertTriangle className="w-3 h-3 inline mr-1" />
+                          {attemptsLeft}/{MAX_ATTEMPTS} attempts remaining
+                        </p>
+                      )}
+                    </div>
+
+                    <Button
+                      type="submit"
+                      disabled={loading || !password.trim()}
+                      className="w-full py-5 font-semibold bg-primary text-primary-foreground hover:shadow-glow transition-all duration-200"
+                      data-ocid="admin.submit_button"
+                    >
+                      {loading ? (
+                        <>
+                          <Loader2 className="mr-2 w-4 h-4 animate-spin" />
+                          Verifying...
+                        </>
+                      ) : (
+                        <>
+                          <Lock className="mr-2 w-4 h-4" />
+                          Continue to PIN
+                        </>
+                      )}
+                    </Button>
+                  </form>
                 )}
-              </AnimatePresence>
-            </div>
 
-            <Button
-              type="submit"
-              disabled={loading || !password.trim()}
-              className="w-full py-5 font-semibold bg-primary text-primary-foreground hover:shadow-glow transition-all duration-200"
-              data-ocid="admin.submit_button"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 w-4 h-4 animate-spin" />
-                  Verifying...
-                </>
-              ) : (
-                "Access Dashboard"
-              )}
-            </Button>
-          </form>
-
-          <div className="mt-6 text-center">
-            <Link
-              to="/"
-              className="text-sm text-muted-foreground hover:text-primary transition-colors"
-              data-ocid="admin.link"
-            >
-              ← Back to Portfolio
-            </Link>
-          </div>
+                <div className="mt-6 flex items-center justify-between">
+                  <Link
+                    to="/"
+                    className="text-sm text-muted-foreground hover:text-primary transition-colors"
+                    data-ocid="admin.link"
+                  >
+                    ← Back to Portfolio
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => setShowEmergencyConfirm(true)}
+                    className="text-xs text-muted-foreground/40 hover:text-muted-foreground/70 transition-colors"
+                    data-ocid="admin.emergency.button"
+                  >
+                    Emergency Reset
+                  </button>
+                </div>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="pin-step"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 20 }}
+                transition={{ duration: 0.25 }}
+              >
+                <PinStep
+                  onSuccess={onSuccess}
+                  onBack={() => {
+                    setStep("password");
+                    setPassword("");
+                  }}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </motion.div>
+
+      {/* Emergency Reset Confirm Dialog */}
+      <Dialog
+        open={showEmergencyConfirm}
+        onOpenChange={setShowEmergencyConfirm}
+      >
+        <DialogContent
+          className="glass-strong border-border/50 max-w-sm"
+          data-ocid="admin.emergency.dialog"
+        >
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="w-5 h-5" />
+              Emergency Reset
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            This will clear all lockout state and attempt counters. Your
+            password will NOT be changed.
+          </p>
+          <DialogFooter className="gap-2 mt-4">
+            <Button
+              variant="outline"
+              onClick={() => setShowEmergencyConfirm(false)}
+              className="border-border/50"
+              data-ocid="admin.emergency.cancel_button"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleEmergencyReset}
+              data-ocid="admin.emergency.confirm_button"
+            >
+              Reset Lockout
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -3288,6 +3873,364 @@ function SiteSettingsTab({ onSaved }: SiteSettingsTabProps) {
 }
 
 // ─────────────────────────────────────────
+// Security Tab
+// ─────────────────────────────────────────
+function SecurityTab({ onLogout }: { onLogout: () => void }) {
+  // ── Change Password ──
+  const [curPw, setCurPw] = useState("");
+  const [newPw, setNewPw] = useState("");
+  const [confirmPw, setConfirmPw] = useState("");
+  const [pwSaving, setPwSaving] = useState(false);
+  const [showPws, setShowPws] = useState(false);
+
+  // ── Change PIN ──
+  const [curPin, setCurPin] = useState("");
+  const [newPin, setNewPin] = useState("");
+  const [pinSaving, setPinSaving] = useState(false);
+
+  // ── Login History ──
+  const [history, setHistory] = useState<LoginHistoryEntry[]>([]);
+
+  // ── Session ──
+  const [sessionStart] = useState<number>(() => {
+    const raw = localStorage.getItem(SESSION_KEY);
+    return raw ? Number.parseInt(raw) : Date.now();
+  });
+
+  useEffect(() => {
+    const state = getAuthState();
+    setHistory(state.loginHistory ?? []);
+  }, []);
+
+  const handleSavePassword = () => {
+    const storedPassword =
+      localStorage.getItem("admin_password") || "portfolio2024";
+    if (curPw !== storedPassword) {
+      toast.error("Current password is incorrect");
+      return;
+    }
+    if (!newPw.trim() || newPw.length < 6) {
+      toast.error("New password must be at least 6 characters");
+      return;
+    }
+    if (newPw !== confirmPw) {
+      toast.error("Passwords do not match");
+      return;
+    }
+    setPwSaving(true);
+    localStorage.setItem("admin_password", newPw);
+    toast.success("Password updated successfully!");
+    setCurPw("");
+    setNewPw("");
+    setConfirmPw("");
+    setPwSaving(false);
+  };
+
+  const handleSavePin = () => {
+    const storedPin = localStorage.getItem("admin_pin") || "2024";
+    if (curPin !== storedPin) {
+      toast.error("Current PIN is incorrect");
+      return;
+    }
+    if (!/^\d{4}$/.test(newPin)) {
+      toast.error("New PIN must be exactly 4 digits");
+      return;
+    }
+    setPinSaving(true);
+    localStorage.setItem("admin_pin", newPin);
+    toast.success("PIN updated successfully!");
+    setCurPin("");
+    setNewPin("");
+    setPinSaving(false);
+  };
+
+  const handleClearHistory = () => {
+    const state = getAuthState();
+    const updated = { ...state, loginHistory: [] };
+    saveAuthState(updated);
+    setHistory([]);
+    toast.success("Login history cleared");
+  };
+
+  const formatTs = (ts: number) => {
+    const d = new Date(ts);
+    return d.toLocaleString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const formatSessionDuration = () => {
+    const diff = Math.floor((Date.now() - sessionStart) / 1000);
+    const h = Math.floor(diff / 3600);
+    const m = Math.floor((diff % 3600) / 60);
+    const s = diff % 60;
+    if (h > 0) return `${h}h ${m}m`;
+    if (m > 0) return `${m}m ${s}s`;
+    return `${s}s`;
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="font-display text-xl font-bold">Security</h2>
+          <p className="text-sm text-muted-foreground">
+            Password, PIN, and session management
+          </p>
+        </div>
+      </div>
+
+      <div className="space-y-5">
+        {/* Change Password */}
+        <div className="glass rounded-2xl p-6 space-y-4">
+          <h3 className="font-semibold text-sm flex items-center gap-2">
+            <Lock className="w-3.5 h-3.5 text-primary" />
+            Change Password
+          </h3>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label>Current Password</Label>
+              <div className="relative">
+                <Input
+                  type={showPws ? "text" : "password"}
+                  value={curPw}
+                  onChange={(e) => setCurPw(e.target.value)}
+                  placeholder="Enter current password"
+                  className="bg-input/50 pr-10"
+                  data-ocid="security.cur-password.input"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPws(!showPws)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showPws ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>New Password</Label>
+                <Input
+                  type={showPws ? "text" : "password"}
+                  value={newPw}
+                  onChange={(e) => setNewPw(e.target.value)}
+                  placeholder="Min. 6 characters"
+                  className="bg-input/50"
+                  data-ocid="security.new-password.input"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Confirm New Password</Label>
+                <Input
+                  type={showPws ? "text" : "password"}
+                  value={confirmPw}
+                  onChange={(e) => setConfirmPw(e.target.value)}
+                  placeholder="Repeat new password"
+                  className="bg-input/50"
+                  data-ocid="security.confirm-password.input"
+                />
+              </div>
+            </div>
+            <Button
+              onClick={handleSavePassword}
+              disabled={pwSaving || !curPw || !newPw || !confirmPw}
+              className="bg-primary text-primary-foreground hover:shadow-glow"
+              data-ocid="security.save-password.button"
+            >
+              {pwSaving ? (
+                <Loader2 className="mr-2 w-4 h-4 animate-spin" />
+              ) : (
+                <ShieldCheck className="mr-2 w-4 h-4" />
+              )}
+              Update Password
+            </Button>
+          </div>
+        </div>
+
+        {/* Change PIN */}
+        <div className="glass rounded-2xl p-6 space-y-4">
+          <h3 className="font-semibold text-sm flex items-center gap-2">
+            <Settings className="w-3.5 h-3.5 text-primary" />
+            Change PIN
+            <span className="text-xs text-muted-foreground font-normal">
+              (4-digit second-factor)
+            </span>
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Current PIN</Label>
+              <Input
+                type="number"
+                value={curPin}
+                onChange={(e) => setCurPin(e.target.value.slice(0, 4))}
+                placeholder="Current 4-digit PIN"
+                className="bg-input/50 [appearance:textfield]"
+                data-ocid="security.cur-pin.input"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>New PIN</Label>
+              <Input
+                type="number"
+                value={newPin}
+                onChange={(e) => setNewPin(e.target.value.slice(0, 4))}
+                placeholder="New 4-digit PIN"
+                className="bg-input/50 [appearance:textfield]"
+                data-ocid="security.new-pin.input"
+              />
+            </div>
+          </div>
+          <Button
+            onClick={handleSavePin}
+            disabled={pinSaving || !curPin || !newPin}
+            className="bg-primary text-primary-foreground hover:shadow-glow"
+            data-ocid="security.save-pin.button"
+          >
+            {pinSaving ? (
+              <Loader2 className="mr-2 w-4 h-4 animate-spin" />
+            ) : (
+              <ShieldCheck className="mr-2 w-4 h-4" />
+            )}
+            Update PIN
+          </Button>
+        </div>
+
+        {/* Login History */}
+        <div className="glass rounded-2xl p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold text-sm flex items-center gap-2">
+              <History className="w-3.5 h-3.5 text-primary" />
+              Login History
+              <span className="text-xs text-muted-foreground font-normal">
+                (last {Math.min(history.length, 5)})
+              </span>
+            </h3>
+            {history.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleClearHistory}
+                className="text-xs text-muted-foreground hover:text-destructive h-7 gap-1"
+                data-ocid="security.clear-history.button"
+              >
+                <Trash2 className="w-3 h-3" />
+                Clear
+              </Button>
+            )}
+          </div>
+
+          {history.length === 0 ? (
+            <div
+              className="text-center py-8"
+              data-ocid="security.history.empty_state"
+            >
+              <History className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground">
+                No login history yet.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {history.slice(0, 5).map((entry, i) => (
+                <div
+                  key={`${entry.timestamp}-${i}`}
+                  className="flex items-center justify-between py-2.5 px-3 rounded-xl"
+                  style={{
+                    background: entry.success
+                      ? "oklch(0.70 0.18 145 / 0.06)"
+                      : "oklch(0.63 0.22 25 / 0.06)",
+                    border: `1px solid ${entry.success ? "oklch(0.70 0.18 145 / 0.15)" : "oklch(0.63 0.22 25 / 0.15)"}`,
+                  }}
+                  data-ocid={`security.history.item.${i + 1}`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    {entry.success ? (
+                      <CheckCircle2
+                        className="w-4 h-4 flex-shrink-0"
+                        style={{ color: "oklch(0.70 0.18 145)" }}
+                      />
+                    ) : (
+                      <AlertTriangle
+                        className="w-4 h-4 flex-shrink-0"
+                        style={{ color: "oklch(0.63 0.22 25)" }}
+                      />
+                    )}
+                    <div>
+                      <div className="text-xs font-medium">
+                        {entry.success ? (
+                          <span style={{ color: "oklch(0.70 0.18 145)" }}>
+                            Success
+                          </span>
+                        ) : (
+                          <span style={{ color: "oklch(0.75 0.20 25)" }}>
+                            Failed
+                          </span>
+                        )}
+                        {entry.note && (
+                          <span className="text-muted-foreground font-normal ml-1.5">
+                            — {entry.note}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground/60 mt-0.5 flex items-center gap-1">
+                        <Clock className="w-2.5 h-2.5" />
+                        {formatTs(entry.timestamp)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Active Session */}
+        <div className="glass rounded-2xl p-6 space-y-4">
+          <h3 className="font-semibold text-sm flex items-center gap-2">
+            <User className="w-3.5 h-3.5 text-primary" />
+            Active Session
+          </h3>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">Admin</p>
+              <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1.5">
+                <Clock className="w-3 h-3" />
+                Session started:{" "}
+                {new Date(sessionStart).toLocaleTimeString("en-IN")}
+                <span className="text-primary ml-1">
+                  ({formatSessionDuration()} ago)
+                </span>
+              </p>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                localStorage.removeItem(SESSION_KEY);
+                onLogout();
+              }}
+              className="text-destructive hover:bg-destructive/10 gap-1.5"
+              data-ocid="security.logout.button"
+            >
+              <LogOut className="w-4 h-4" />
+              Logout & Clear Session
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────
 // Inline Preview Pane (desktop sidebar)
 // ─────────────────────────────────────────
 interface InlinePreviewPaneProps {
@@ -3577,6 +4520,14 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                     <Settings className="w-4 h-4" />
                     Site
                   </TabsTrigger>
+                  <TabsTrigger
+                    value="security"
+                    className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary rounded-md px-4 py-2.5 text-sm font-medium gap-2 whitespace-nowrap"
+                    data-ocid="admin.security.tab"
+                  >
+                    <ShieldCheck className="w-4 h-4" />
+                    Security
+                  </TabsTrigger>
                 </TabsList>
               </div>
 
@@ -3615,6 +4566,12 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
               </TabsContent>
               <TabsContent value="site" className="focus-visible:outline-none">
                 <SiteSettingsTab onSaved={handleSaved} />
+              </TabsContent>
+              <TabsContent
+                value="security"
+                className="focus-visible:outline-none"
+              >
+                <SecurityTab onLogout={onLogout} />
               </TabsContent>
             </Tabs>
           </div>

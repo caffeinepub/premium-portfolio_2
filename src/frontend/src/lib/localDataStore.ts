@@ -452,8 +452,20 @@ export function applyDesignToDOM(settings: DesignSettings): void {
       -webkit-text-fill-color: transparent !important;
       background-clip: text !important;
     }
+    .glass {
+      background: oklch(${bgValue} / 0.60) !important;
+      backdrop-filter: blur(16px) saturate(180%) !important;
+      -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
+      border: 1px solid var(--theme-border-line) !important;
+    }
+    .glass-strong {
+      background: oklch(${bgValue} / 0.88) !important;
+      backdrop-filter: blur(24px) saturate(200%) !important;
+      -webkit-backdrop-filter: blur(24px) saturate(200%) !important;
+      border: 1px solid var(--theme-border-line) !important;
+    }
     .glass-red {
-      background: oklch(0.11 0.02 15 / 0.7) !important;
+      background: oklch(${bgValue} / 0.70) !important;
       backdrop-filter: blur(20px) saturate(200%) !important;
       -webkit-backdrop-filter: blur(20px) saturate(200%) !important;
       border: 1px solid var(--theme-primary-border) !important;
